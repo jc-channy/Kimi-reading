@@ -740,38 +740,29 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        if (isExcel) {
-          const wb = XLSX.read(ev.target.result, { type: 'array' });
-          const booksSheet = wb.Sheets[wb.SheetNames[0]];
-          const recsSheet = wb.SheetNames[1] ? wb.Sheets[wb.SheetNames[1]] : null;
-          const parsedBooks = parseSheet(booksSheet, BOOK_COL_MAP).map(b => ({
-            id: genId(), title: b.title || '', author: b.author || '',
-            series: b.series || '', audioSource: b.audioSource || 'YouTube',
-            notes: b.notes || '', rating: parseInt(b.rating) || 0, createdAt: today()
-          })).filter(b => b.title);
-          const parsedRecs = recsSheet ? parseSheet(recsSheet, REC_COL_MAP).map(r => ({
-            id: genId(), bookId: '', bookTitle: r.bookTitle || '',
-            date: r.date || today(), duration: r.duration || '20分鐘',
-            leloReaction: r.leloReaction || '', leloFollowed: r.leloFollowed === true || r.leloFollowed === '是' || r.leloFollowed === 'true',
-            leloSentences: r.leloSentences || '', momNotes: r.momNotes || '', createdAt: today()
-          })).filter(r => r.bookTitle) : [];
-          if (parsedBooks.length === 0) { toast('找不到書單資料，請確認欄位名稱'); return; }
-          setPendingImport({ books: parsedBooks, records: parsedRecs });
-          setImportMode('confirm');
-        } else {
-          const data = JSON.parse(ev.target.result);
-          if (!data.books && !data.records) { toast('格式不符，請選擇正確的備份檔'); return; }
-          setPendingImport(data);
-          setImportMode('confirm');
-        }
+        const wb = XLSX.read(ev.target.result, { type: 'array' });
+        const booksSheet = wb.Sheets[wb.SheetNames[0]];
+        const recsSheet = wb.SheetNames[1] ? wb.Sheets[wb.SheetNames[1]] : null;
+        const parsedBooks = parseSheet(booksSheet, BOOK_COL_MAP).map(b => ({
+          id: genId(), title: b.title || '', author: b.author || '',
+          series: b.series || '', audioSource: b.audioSource || 'YouTube',
+          notes: b.notes || '', rating: parseInt(b.rating) || 0, createdAt: today()
+        })).filter(b => b.title);
+        const parsedRecs = recsSheet ? parseSheet(recsSheet, REC_COL_MAP).map(r => ({
+          id: genId(), bookId: '', bookTitle: r.bookTitle || '',
+          date: r.date || today(), duration: r.duration || '20分鐘',
+          leloReaction: r.leloReaction || '', leloFollowed: r.leloFollowed === true || r.leloFollowed === '是' || r.leloFollowed === 'true',
+          leloSentences: r.leloSentences || '', momNotes: r.momNotes || '', createdAt: today()
+        })).filter(r => r.bookTitle) : [];
+        if (parsedBooks.length === 0) { toast('找不到書單資料，請確認欄位名稱'); return; }
+        setPendingImport({ books: parsedBooks, records: parsedRecs });
+        setImportMode('confirm');
       } catch (err) { toast('讀取失敗：' + err.message); }
     };
-    if (isExcel) reader.readAsArrayBuffer(file);
-    else reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
 
@@ -881,7 +872,7 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
           <button onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 20, border: '1.5px solid var(--primary)', background: '#F5E8DA', color: 'var(--primary-dark)', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>
             <i className="ti ti-upload" /> 匯入
           </button>
-          <input ref={fileInputRef} type="file" accept=".json,.xlsx,.xls" style={{ display: 'none' }} onChange={handleFileChange} />
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleFileChange} />
         </div>
       </div>
 
@@ -1092,14 +1083,14 @@ function App() {
   }, []);
 
   const exportData = useCallback(() => {
-    const data = { version: 2, exportedAt: new Date().toISOString(), books, records };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'lele-reading-' + today() + '.json';
-    a.click();
-    URL.revokeObjectURL(url);
+    const wb = XLSX.utils.book_new();
+    const bookRows = [['書名','作者','系列','音源','備註','星星']];
+    books.forEach(b => bookRows.push([b.title, b.author||'', b.series||'', b.audioSource||'', b.notes||'', b.rating||0]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bookRows), '書單');
+    const recRows = [['書名','日期','時間','反應','跟著唸','學到的句子','媽媽觀察']];
+    records.forEach(r => recRows.push([r.bookTitle, r.date, r.duration, r.leloReaction||'', r.leloFollowed ? '是' : '否', r.leloSentences||'', r.momNotes||'']));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(recRows), '共讀紀錄');
+    XLSX.writeFile(wb, 'lele-reading-' + today() + '.xlsx');
   }, [books, records]);
 
   const importData = useCallback((data, mode) => {
