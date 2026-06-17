@@ -707,22 +707,19 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
   const [pendingImport, setPendingImport] = useState(null);
   const fileInputRef = React.useRef(null);
 
-  const BOOK_COL_MAP = {
+  const ROW_COL_MAP = {
     '書名': 'title', 'title': 'title',
     '作者': 'author', 'author': 'author',
     '系列': 'series', 'series': 'series',
-    '音源': 'audioSource', 'audiosource': 'audioSource', 'audio': 'audioSource',
-    '備註': 'notes', 'notes': 'notes',
-    '星星': 'rating', '喜愛度': 'rating', 'rating': 'rating',
-  };
-  const REC_COL_MAP = {
-    '書名': 'bookTitle', 'booktitle': 'bookTitle',
+    '音源': 'audioSource', 'audiosource': 'audioSource',
+    '書本備註': 'notes', '備註': 'notes', 'notes': 'notes',
+    '星星': 'rating', 'rating': 'rating',
     '日期': 'date', 'date': 'date',
     '時間': 'duration', 'duration': 'duration',
     '反應': 'leloReaction', 'reaction': 'leloReaction',
     '跟著唸': 'leloFollowed', 'followed': 'leloFollowed',
     '學到的句子': 'leloSentences', 'sentences': 'leloSentences',
-    '媽媽觀察': 'momNotes', 'momnotes': 'momNotes', '觀察': 'momNotes',
+    '媽媽觀察': 'momNotes', 'momnotes': 'momNotes',
   };
 
   const parseSheet = (sheet, colMap) => {
@@ -744,20 +741,26 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
     reader.onload = (ev) => {
       try {
         const wb = XLSX.read(ev.target.result, { type: 'array' });
-        const booksSheet = wb.Sheets[wb.SheetNames[0]];
-        const recsSheet = wb.SheetNames[1] ? wb.Sheets[wb.SheetNames[1]] : null;
-        const parsedBooks = parseSheet(booksSheet, BOOK_COL_MAP).map(b => ({
-          id: genId(), title: b.title || '', author: b.author || '',
-          series: b.series || '', audioSource: b.audioSource || 'YouTube',
-          notes: b.notes || '', rating: parseInt(b.rating) || 0, createdAt: today()
-        })).filter(b => b.title);
-        const parsedRecs = recsSheet ? parseSheet(recsSheet, REC_COL_MAP).map(r => ({
-          id: genId(), bookId: '', bookTitle: r.bookTitle || '',
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = parseSheet(sheet, ROW_COL_MAP).filter(r => r.title);
+        if (rows.length === 0) { toast('找不到資料，請確認欄位名稱'); return; }
+        // Deduplicate books by title
+        const bookByTitle = {};
+        rows.forEach(r => {
+          if (!bookByTitle[r.title]) {
+            bookByTitle[r.title] = { id: genId(), title: r.title, author: r.author||'', series: r.series||'', audioSource: r.audioSource||'YouTube', notes: r.notes||'', rating: parseInt(r.rating)||0, createdAt: today() };
+          } else if (r.rating) {
+            bookByTitle[r.title].rating = parseInt(r.rating) || bookByTitle[r.title].rating;
+          }
+        });
+        const parsedBooks = Object.values(bookByTitle);
+        const parsedRecs = rows.filter(r => r.date).map(r => ({
+          id: genId(), bookId: bookByTitle[r.title]?.id || '', bookTitle: r.title,
           date: r.date || today(), duration: r.duration || '20分鐘',
-          leloReaction: r.leloReaction || '', leloFollowed: r.leloFollowed === true || r.leloFollowed === '是' || r.leloFollowed === 'true',
+          leloReaction: r.leloReaction || '',
+          leloFollowed: r.leloFollowed === true || r.leloFollowed === '是' || r.leloFollowed === 'true',
           leloSentences: r.leloSentences || '', momNotes: r.momNotes || '', createdAt: today()
-        })).filter(r => r.bookTitle) : [];
-        if (parsedBooks.length === 0) { toast('找不到書單資料，請確認欄位名稱'); return; }
+        }));
         setPendingImport({ books: parsedBooks, records: parsedRecs });
         setImportMode('confirm');
       } catch (err) { toast('讀取失敗：' + err.message); }
@@ -768,17 +771,14 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
 
   const downloadTemplate = () => {
     const wb = XLSX.utils.book_new();
-    const bookData = [
-      ['書名', '作者', '系列', '音源', '備註', '星星'],
-      ['I Love My White Shoes', 'James Dean', 'Pete the Cat', 'YouTube', '', 5],
-      ['Brown Bear, Brown Bear', 'Bill Martin Jr.', '', 'YouTube', '重複句型好學', 4],
+    const data = [
+      HEADERS,
+      ['I Love My White Shoes', 'James Dean', 'Pete the Cat', 'YouTube', '', 5, '2026-06-10', '20分鐘', 'love', '是', 'no matter what', ''],
+      ['I Love My White Shoes', 'James Dean', 'Pete the Cat', 'YouTube', '', 5, '2026-06-15', '20分鐘', 'love', '是', '', '很喜歡唱'],
+      ['Brown Bear, Brown Bear', 'Bill Martin Jr.', '', 'YouTube', '重複句型好學', 4, '2026-06-12', '15分鐘', 'like', '是', 'What do you see?', ''],
+      ['The Very Hungry Caterpillar', 'Eric Carle', '', 'CD', '', 3, '', '', '', '', '', ''],
     ];
-    const recData = [
-      ['書名', '日期', '時間', '反應', '跟著唸', '學到的句子', '媽媽觀察'],
-      ['I Love My White Shoes', '2026-06-10', '20分鐘', 'love', '是', 'no matter what', ''],
-    ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bookData), '書單');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(recData), '共讀紀錄');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), '共讀紀錄');
     XLSX.writeFile(wb, 'lele-reading-template.xlsx');
   };
 
@@ -1082,14 +1082,27 @@ function App() {
     }
   }, []);
 
+  const HEADERS = ['書名','作者','系列','音源','書本備註','星星','日期','時間','反應','跟著唸','學到的句子','媽媽觀察'];
+
   const exportData = useCallback(() => {
     const wb = XLSX.utils.book_new();
-    const bookRows = [['書名','作者','系列','音源','備註','星星']];
-    books.forEach(b => bookRows.push([b.title, b.author||'', b.series||'', b.audioSource||'', b.notes||'', b.rating||0]));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bookRows), '書單');
-    const recRows = [['書名','日期','時間','反應','跟著唸','學到的句子','媽媽觀察']];
-    records.forEach(r => recRows.push([r.bookTitle, r.date, r.duration, r.leloReaction||'', r.leloFollowed ? '是' : '否', r.leloSentences||'', r.momNotes||'']));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(recRows), '共讀紀錄');
+    const rows = [HEADERS];
+    // Books with records
+    const bookMap = Object.fromEntries(books.map(b => [b.id, b]));
+    const coveredBookIds = new Set();
+    records.forEach(r => {
+      const b = bookMap[r.bookId] || {};
+      coveredBookIds.add(r.bookId);
+      rows.push([
+        b.title || r.bookTitle, b.author||'', b.series||'', b.audioSource||'', b.notes||'', b.rating||0,
+        r.date, r.duration, r.leloReaction||'', r.leloFollowed ? '是' : '否', r.leloSentences||'', r.momNotes||''
+      ]);
+    });
+    // Books with no records
+    books.filter(b => !coveredBookIds.has(b.id)).forEach(b => {
+      rows.push([b.title, b.author||'', b.series||'', b.audioSource||'', b.notes||'', b.rating||0, '','','','','','']);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), '共讀紀錄');
     XLSX.writeFile(wb, 'lele-reading-' + today() + '.xlsx');
   }, [books, records]);
 
