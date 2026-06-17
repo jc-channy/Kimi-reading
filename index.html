@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>樂樂英文有聲書共讀紀錄</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.10/babel.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #FDF8F2;
+    --card: #FFFFFF;
+    --card-border: #EAD8C0;
+    --primary: #C8895A;
+    --primary-dark: #A06838;
+    --primary-btn: linear-gradient(135deg, #C8895A, #A06838);
+    --text: #3A2810;
+    --text-sub: #9A7848;
+    --text-light: #B09070;
+    --nav-active: #9E6838;
+    --hero-a: #E8CFA8;
+    --hero-b: #F2E0C0;
+    --hero-c: #FAF0DC;
+    --star-hi: #E8A840;
+    --star-mid: #C8A850;
+    --star-lo: #C0B098;
+    --shadow: 0 2px 12px rgba(160,104,56,0.10);
+    --shadow-lg: 0 4px 20px rgba(160,104,56,0.15);
+    --radius: 14px;
+    --nav-h: 68px;
+    --font-round: 'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', 'rounded-mplus-1p', 'Nunito', sans-serif;
+  }
+  html, body { height: 100%; background: var(--bg); font-family: var(--font-round); color: var(--text); }
+  #root { height: 100%; }
+
+  /* ── Layout ── */
+  .app { display: flex; flex-direction: column; min-height: 100vh; }
+  .page { flex: 1; padding: 0 0 calc(var(--nav-h) + 16px); overflow-y: auto; }
+
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(160deg, var(--hero-a) 0%, var(--hero-b) 40%, var(--hero-c) 70%, var(--bg) 100%);
+    padding: 32px 20px 24px;
+  }
+  .hero-title { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: 0.02em; }
+  .hero-sub { font-size: 13px; color: var(--text-sub); margin-top: 4px; }
+  .hero-stats { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  .stat-pill {
+    background: rgba(255,255,255,0.72);
+    border: 0.5px solid var(--card-border);
+    border-radius: 24px;
+    padding: 6px 14px;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: var(--text); font-weight: 600;
+    backdrop-filter: blur(4px);
+  }
+  .stat-pill i { font-size: 15px; color: var(--primary); }
+  .stat-pill span { font-size: 11px; color: var(--text-sub); font-weight: 400; margin-left: 2px; }
+  .hero-cta {
+    margin-top: 16px;
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--primary-btn);
+    color: #fff; border: none; border-radius: 24px;
+    padding: 10px 20px; font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: var(--font-round);
+    box-shadow: 0 2px 10px rgba(168,104,56,0.30);
+    transition: opacity 0.15s;
+  }
+  .hero-cta:active { opacity: 0.82; }
+
+  /* ── Section header ── */
+  .section { padding: 20px 16px 0; }
+  .section-title { font-size: 13px; font-weight: 700; color: var(--text-sub); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; }
+
+  /* ── Book card (home list) ── */
+  .book-list { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 16px; }
+  .book-card {
+    background: var(--card);
+    border: 0.5px solid var(--card-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    display: flex; align-items: center;
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+  }
+  .book-card:active { box-shadow: var(--shadow-lg); }
+  .book-spine { width: 8px; flex-shrink: 0; align-self: stretch; }
+  .book-card-inner { flex: 1; padding: 12px; min-width: 0; }
+  .book-card-title { font-size: 15px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .book-card-author { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+  .book-card-meta { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .book-stars { display: flex; gap: 2px; }
+  .date-chip {
+    background: #F5EDE0;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 11px; color: var(--text-sub);
+    font-weight: 500;
+  }
+  .book-card-right { padding: 12px 14px 12px 0; display: flex; align-items: center; }
+  .book-count-badge {
+    background: #F0E4D4;
+    border-radius: 12px;
+    padding: 3px 9px;
+    font-size: 12px; color: var(--primary-dark); font-weight: 700;
+    display: flex; align-items: center; gap: 3px;
+  }
+  .no-books { text-align: center; padding: 40px 20px; color: var(--text-light); font-size: 14px; }
+  .no-books i { font-size: 40px; color: var(--card-border); display: block; margin-bottom: 10px; }
+
+  /* ── Bottom nav ── */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: var(--nav-h);
+    background: rgba(253,248,242,0.95);
+    border-top: 0.5px solid var(--card-border);
+    backdrop-filter: blur(10px);
+    display: flex; align-items: center; justify-content: space-around;
+    padding: 0 20px;
+    z-index: 100;
+  }
+  .nav-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    background: none; border: none; cursor: pointer;
+    color: var(--text-light); font-family: var(--font-round);
+    padding: 6px 16px; border-radius: 12px; transition: color 0.15s;
+    flex: 1;
+  }
+  .nav-btn.on { color: var(--nav-active); }
+  .nav-btn i { font-size: 22px; }
+  .nl { font-size: 10px; font-weight: 600; }
+  .fab {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--primary-btn);
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 16px rgba(168,104,56,0.35);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+  .fab:active { transform: scale(0.93); }
+  .fab i { font-size: 24px; color: #fff; }
+
+  /* ── Cards / Forms ── */
+  .card {
+    background: var(--card);
+    border: 0.5px solid var(--card-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px;
+    margin: 0 16px 12px;
+  }
+  .card-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .card-title i { color: var(--primary); font-size: 18px; }
+
+  /* Form elements */
+  .form-group { margin-bottom: 16px; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--text-sub); margin-bottom: 6px; display: block; }
+  .form-input {
+    width: 100%; padding: 10px 12px;
+    border: 0.5px solid var(--card-border);
+    border-radius: 10px; background: var(--bg);
+    font-size: 14px; color: var(--text); font-family: var(--font-round);
+    outline: none; transition: border-color 0.15s;
+  }
+  .form-input:focus { border-color: var(--primary); }
+  .form-select {
+    width: 100%; padding: 10px 12px;
+    border: 0.5px solid var(--card-border);
+    border-radius: 10px; background: var(--bg);
+    font-size: 14px; color: var(--text); font-family: var(--font-round);
+    outline: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A7848' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; background-size: 18px;
+  }
+  .form-select:focus { border-color: var(--primary); }
+
+  /* Chip selectors */
+  .chip-group { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    padding: 7px 14px; border-radius: 20px;
+    border: 1.5px solid var(--card-border);
+    background: var(--bg); color: var(--text-sub);
+    font-size: 13px; font-family: var(--font-round); cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chip.sel { border-color: var(--primary); background: #F5E8DA; color: var(--primary-dark); font-weight: 600; }
+
+  /* Reaction buttons */
+  .reaction-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .reaction-btn {
+    padding: 10px 8px; border-radius: 12px;
+    border: 1.5px solid var(--card-border);
+    background: var(--bg); color: var(--text);
+    font-size: 13px; font-family: var(--font-round); cursor: pointer;
+    text-align: center; transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .reaction-btn.sel { border-color: var(--primary); background: #F5E8DA; color: var(--primary-dark); font-weight: 600; }
+
+  /* Toggle */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .toggle-label { font-size: 14px; color: var(--text); }
+  .toggle {
+    width: 46px; height: 26px; border-radius: 13px;
+    border: none; cursor: pointer; position: relative;
+    background: #D8C8B4; transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle.on { background: var(--primary); }
+  .toggle::after {
+    content: ''; position: absolute;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; top: 3px; left: 3px;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.20);
+  }
+  .toggle.on::after { transform: translateX(20px); }
+
+  /* Star rating interactive */
+  .star-rate { display: flex; gap: 6px; }
+  .star-btn { background: none; border: none; cursor: pointer; padding: 0; font-size: 26px; transition: transform 0.1s; }
+  .star-btn:active { transform: scale(1.2); }
+
+  /* Dashed divider */
+  .dashed-divider { border: none; border-top: 1.5px dashed var(--card-border); margin: 16px 0; }
+
+  /* Primary action button */
+  .btn-primary {
+    width: 100%; padding: 14px;
+    background: var(--primary-btn);
+    color: #fff; border: none; border-radius: 12px;
+    font-size: 16px; font-weight: 700; font-family: var(--font-round);
+    cursor: pointer; box-shadow: 0 3px 12px rgba(168,104,56,0.28);
+    transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-primary:active { opacity: 0.82; }
+  .btn-secondary {
+    padding: 10px 20px;
+    background: var(--bg); color: var(--primary-dark);
+    border: 1.5px solid var(--primary);
+    border-radius: 12px;
+    font-size: 14px; font-weight: 600; font-family: var(--font-round);
+    cursor: pointer; transition: background 0.15s;
+  }
+  .btn-secondary:active { background: #F5E8DA; }
+
+  /* Page header */
+  .page-header { padding: 20px 16px 8px; display: flex; align-items: center; gap: 10px; }
+  .page-header-title { font-size: 20px; font-weight: 700; color: var(--text); }
+
+  /* Inline new-book form expansion */
+  .inline-form {
+    background: #FDF5EC;
+    border: 0.5px solid var(--card-border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 10px;
+  }
+  .inline-form .form-label { color: var(--text-light); font-size: 11px; }
+
+  /* ── Library ── */
+  .series-block { margin: 0 16px 14px; }
+  .series-header {
+    display: flex; align-items: center; justify-content: space-between;
+    border-radius: 10px 10px 0 0;
+    padding: 10px 14px;
+    cursor: pointer;
+  }
+  .series-header-left { display: flex; align-items: center; gap: 8px; }
+  .series-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .series-name { font-size: 14px; font-weight: 700; }
+  .series-count { font-size: 12px; opacity: 0.7; }
+  .series-chevron { font-size: 18px; transition: transform 0.2s; }
+  .series-chevron.open { transform: rotate(180deg); }
+  .series-books {
+    border: 0.5px solid var(--card-border);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    overflow: hidden;
+  }
+  .lib-book-row {
+    background: var(--card);
+    display: flex; align-items: center;
+    padding: 12px 14px; gap: 10px;
+    border-bottom: 0.5px solid var(--card-border);
+    cursor: pointer;
+  }
+  .lib-book-row:last-child { border-bottom: none; }
+  .lib-book-row:active { background: #FDF5EC; }
+  .lib-spine { width: 5px; align-self: stretch; border-radius: 2px; flex-shrink: 0; }
+  .lib-book-info { flex: 1; min-width: 0; }
+  .lib-book-title { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lib-book-author { font-size: 12px; color: var(--text-light); }
+  .lib-book-stars { display: flex; gap: 1px; }
+
+  /* Standalone section in library */
+  .standalone-header { padding: 6px 16px 8px; font-size: 12px; font-weight: 700; color: var(--text-sub); letter-spacing: 0.08em; text-transform: uppercase; }
+
+  /* Add book in library */
+  .add-book-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin: 4px 16px 16px;
+    padding: 12px; border-radius: 12px;
+    border: 1.5px dashed var(--card-border);
+    background: none; color: var(--text-sub);
+    font-size: 14px; font-family: var(--font-round); cursor: pointer;
+    transition: all 0.15s;
+  }
+  .add-book-btn:active { background: #F5EDE0; border-color: var(--primary); color: var(--primary-dark); }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: calc(var(--nav-h) + 16px); left: 50%; transform: translateX(-50%);
+    background: var(--text); color: #fff;
+    padding: 10px 22px; border-radius: 24px;
+    font-size: 13px; font-weight: 600;
+    z-index: 200; pointer-events: none;
+    animation: fadeInUp 0.25s ease, fadeOut 0.3s ease 1.7s forwards;
+    white-space: nowrap;
+  }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+  @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 32px 20px; color: var(--text-light); }
+  .empty-state i { font-size: 48px; color: #DDD0C0; display: block; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; line-height: 1.6; }
+
+  /* Textarea */
+  textarea.form-input { resize: vertical; min-height: 72px; }
+
+  @media (min-width: 600px) {
+    .page { max-width: 480px; margin: 0 auto; }
+    .bottom-nav { max-width: 480px; left: 50%; transform: translateX(-50%); }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo, useCallback } = React;
+
+/* ── Constants ── */
+const SPINE_COLORS = ['#E8A855','#E89880','#90C8A0','#8BBCE0','#E0A0B8','#B8A8E0','#E8C878','#A8C890','#D4A8D0','#9ABCD8'];
+const SERIES_THEMES = [
+  { bg: '#FDF0DC', dot: '#E8A840', border: '#E8C890', text: '#7A5820' },
+  { bg: '#FCE8E4', dot: '#D87060', border: '#EAA898', text: '#7A3828' },
+  { bg: '#E8F4EC', dot: '#60A870', border: '#98CCA8', text: '#285830' },
+  { bg: '#E4EEF8', dot: '#5888C8', border: '#90B8E0', text: '#284870' },
+  { bg: '#EEE8F8', dot: '#9070C8', border: '#C0A8E0', text: '#482880' },
+];
+
+const getSpineColor = (id) => SPINE_COLORS[id.charCodeAt(0) % SPINE_COLORS.length];
+const starColor = (r) => r >= 4 ? '#E8A840' : r >= 3 ? '#C8A850' : '#C0B098';
+
+const DURATION_OPTIONS = ['10分鐘', '15分鐘', '20分鐘', '30分鐘', '40分鐘', '45分鐘', '60分鐘'];
+const REACTION_OPTIONS = [
+  { value: 'love', label: '超愛！', icon: 'heart-filled' },
+  { value: 'like', label: '喜歡', icon: 'thumb-up' },
+  { value: 'ok', label: '還好', icon: 'mood-neutral' },
+  { value: 'skip', label: '不感興趣', icon: 'mood-sad' },
+];
+const AUDIO_SOURCES = ['YouTube', 'Spotify', 'Apple Music', 'CD', '其他'];
+
+const SAMPLE_BOOKS = [];
+const SAMPLE_RECORDS = [];
+
+function today() {
+  return new Date().toISOString().slice(0,10);
+}
+function fmtDate(s) {
+  if (!s) return '';
+  const [,m,d] = s.split('-');
+  return `${m}/${d}`;
+}
+function genId() {
+  return Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4);
+}
+
+/* ── Stars display ── */
+function Stars({ rating, size }) {
+  size = size || 14;
+  const col = starColor(rating);
+  return (
+    <div className="book-stars">
+      {[1,2,3,4,5].map(i => (
+        <i key={i}
+          className={i <= rating ? 'ti ti-star-filled' : 'ti ti-star'}
+          style={{ fontSize: size, color: i <= rating ? col : '#DDD0C0' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ── Interactive star rating ── */
+function StarRating({ value, onChange }) {
+  const [hover, setHover] = useState(0);
+  const display = hover || value;
+  const col = starColor(display);
+  return (
+    <div className="star-rate">
+      {[1,2,3,4,5].map(i => (
+        <button key={i} className="star-btn"
+          onMouseEnter={() => setHover(i)}
+          onMouseLeave={() => setHover(0)}
+          onClick={() => onChange(i)}
+          aria-label={i + '星'}
+        >
+          <i className={i <= display ? 'ti ti-star-filled' : 'ti ti-star'}
+            style={{ color: i <= display ? col : '#DDD0C0' }} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ── Toast ── */
+function Toast({ msg }) {
+  return <div className="toast">{msg}</div>;
+}
+
+/* ═══════════════════════════════════════
+   Dashboard
+═══════════════════════════════════════ */
+function Dashboard({ books, records, navigate }) {
+  const totalDays = useMemo(() => new Set(records.map(r => r.date)).size, [records]);
+  const totalMins = useMemo(() => records.reduce((s, r) => s + (parseInt(r.duration) || 0), 0), [records]);
+
+  const booksWithMeta = useMemo(() => {
+    return books.map(b => {
+      const recs = records.filter(r => r.bookId === b.id).sort((a,z) => z.date.localeCompare(a.date));
+      return { ...b, recentDates: recs.slice(0,3).map(r => r.date), readCount: recs.length };
+    }).sort((a,z) => {
+      const la = a.recentDates[0] || '0';
+      const lz = z.recentDates[0] || '0';
+      return lz.localeCompare(la);
+    });
+  }, [books, records]);
+
+  return (
+    <div className="page" style={{ paddingBottom: 'calc(var(--nav-h) + 16px)' }}>
+      <div className="hero">
+        <div className="hero-title">📖 樂樂的英文共讀</div>
+        <div className="hero-sub">每一天的聆聽，都是成長的足跡</div>
+        <div className="hero-stats">
+          <div className="stat-pill">
+            <i className="ti ti-calendar-heart" />
+            {totalDays}<span>共讀天數</span>
+          </div>
+          <div className="stat-pill">
+            <i className="ti ti-books" />
+            {books.length}<span>本書</span>
+          </div>
+          <div className="stat-pill">
+            <i className="ti ti-clock" />
+            {totalMins}<span>分鐘</span>
+          </div>
+        </div>
+        <button className="hero-cta" onClick={() => navigate('add')}>
+          <i className="ti ti-plus" /> 記錄今天的共讀
+        </button>
+      </div>
+
+      <div className="section">
+        <div className="section-title">共讀書單</div>
+      </div>
+
+      {booksWithMeta.length === 0 ? (
+        <div className="no-books">
+          <i className="ti ti-book-2" />
+          還沒有書喔！點下方「+」開始記錄吧
+        </div>
+      ) : (
+        <div className="book-list">
+          {booksWithMeta.map(b => (
+            <div key={b.id} className="book-card" onClick={() => navigate('add', { bookId: b.id })}>
+              <div className="book-spine" style={{ background: getSpineColor(b.id) }} />
+              <div className="book-card-inner">
+                <div className="book-card-title">{b.title}</div>
+                {b.author && <div className="book-card-author">{b.author}{b.series ? ' · ' + b.series : ''}</div>}
+                <div className="book-card-meta">
+                  {b.rating > 0 && <Stars rating={b.rating} size={13} />}
+                  {b.recentDates.map(d => (
+                    <span key={d} className="date-chip">{fmtDate(d)}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="book-card-right">
+                {b.readCount > 0 && (
+                  <div className="book-count-badge">
+                    <i className="ti ti-headphones" style={{ fontSize: 13 }} />
+                    {b.readCount}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   AddRecord
+═══════════════════════════════════════ */
+function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }) {
+  const [date, setDate] = useState(today());
+  const [bookId, setBookId] = useState(initialBookId || '');
+  const [duration, setDuration] = useState('20分鐘');
+  const [reaction, setReaction] = useState('');
+  const [followed, setFollowed] = useState(false);
+  const [sentences, setSentences] = useState('');
+  const [momNotes, setMomNotes] = useState('');
+  const [updateRating, setUpdateRating] = useState(false);
+  const [newRating, setNewRating] = useState(0);
+
+  const [addingBook, setAddingBook] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newAuthor, setNewAuthor] = useState('');
+  const [newSeries, setNewSeries] = useState('');
+  const [newAudio, setNewAudio] = useState('YouTube');
+  const [newNotes, setNewNotes] = useState('');
+  const [newBookRating, setNewBookRating] = useState(0);
+
+  const selectedBook = useMemo(() => books.find(b => b.id === bookId), [books, bookId]);
+
+  const handleSave = useCallback(() => {
+    if (!bookId) { toast('請選擇書本'); return; }
+    const rec = {
+      id: genId(), bookId,
+      bookTitle: selectedBook ? selectedBook.title : '',
+      date, duration, leloReaction: reaction,
+      leloFollowed: followed, leloSentences: sentences,
+      momNotes, createdAt: today()
+    };
+    addRecord(rec);
+    if (updateRating && newRating > 0 && selectedBook) {
+      addBook({ ...selectedBook, rating: newRating }, true);
+    }
+    toast('✓ 紀錄已儲存！');
+    navigate('home');
+  }, [bookId, selectedBook, date, duration, reaction, followed, sentences, momNotes, updateRating, newRating, addRecord, addBook, navigate, toast]);
+
+  const handleAddBook = useCallback(() => {
+    if (!newTitle.trim()) { toast('請輸入書名'); return; }
+    const b = {
+      id: genId(), title: newTitle.trim(), author: newAuthor.trim(),
+      series: newSeries.trim(), audioSource: newAudio,
+      notes: newNotes.trim(), rating: newBookRating, createdAt: today()
+    };
+    addBook(b);
+    setBookId(b.id);
+    setAddingBook(false);
+    setNewTitle(''); setNewAuthor(''); setNewSeries('');
+    setNewAudio('YouTube'); setNewNotes(''); setNewBookRating(0);
+    toast('書本已新增！');
+  }, [newTitle, newAuthor, newSeries, newAudio, newNotes, newBookRating, addBook, toast]);
+
+  return (
+    <div className="page" style={{ paddingBottom: 'calc(var(--nav-h) + 16px)' }}>
+      <div className="page-header">
+        <i className="ti ti-pencil" style={{ color: 'var(--primary)', fontSize: 22 }} />
+        <div className="page-header-title">記錄共讀</div>
+      </div>
+
+      <div className="card">
+        <div className="card-title"><i className="ti ti-calendar" />日期</div>
+        <input type="date" className="form-input" value={date} onChange={e => setDate(e.target.value)} />
+      </div>
+
+      <div className="card">
+        <div className="card-title"><i className="ti ti-book-2" />選擇書本</div>
+        <select className="form-select" value={bookId} onChange={e => { setBookId(e.target.value); setAddingBook(false); }}>
+          <option value="">請選擇...</option>
+          {books.map(b => (
+            <option key={b.id} value={b.id}>{b.title}{b.series ? ' (' + b.series + ')' : ''}</option>
+          ))}
+        </select>
+        {!addingBook && (
+          <button className="add-book-btn" style={{ margin: '10px 0 0' }} onClick={() => setAddingBook(true)}>
+            <i className="ti ti-plus" /> 新增書本
+          </button>
+        )}
+        {addingBook && (
+          <div className="inline-form">
+            <div className="form-group">
+              <label className="form-label">書名 *</label>
+              <input className="form-input" placeholder="e.g. Green Eggs and Ham" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">作者</label>
+              <input className="form-input" placeholder="作者名稱" value={newAuthor} onChange={e => setNewAuthor(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">系列（選填）</label>
+              <input className="form-input" placeholder="e.g. Pete the Cat" value={newSeries} onChange={e => setNewSeries(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">音源</label>
+              <select className="form-select" value={newAudio} onChange={e => setNewAudio(e.target.value)}>
+                {AUDIO_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">樂樂喜愛度</label>
+              <StarRating value={newBookRating} onChange={setNewBookRating} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">備註（選填）</label>
+              <input className="form-input" placeholder="學習重點、特色等" value={newNotes} onChange={e => setNewNotes(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button className="btn-primary" style={{ flex: 1 }} onClick={handleAddBook}>
+                <i className="ti ti-check" /> 新增書本
+              </button>
+              <button className="btn-secondary" onClick={() => setAddingBook(false)}>取消</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="card-title"><i className="ti ti-clock" />共讀時間</div>
+        <div className="chip-group">
+          {DURATION_OPTIONS.map(d => (
+            <button key={d} className={'chip' + (duration === d ? ' sel' : '')} onClick={() => setDuration(d)}>{d}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title"><i className="ti ti-mood-smile" />樂樂的反應</div>
+        <div className="reaction-grid">
+          {REACTION_OPTIONS.map(r => (
+            <button key={r.value} className={'reaction-btn' + (reaction === r.value ? ' sel' : '')} onClick={() => setReaction(r.value)}>
+              <i className={'ti ti-' + r.icon} /> {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="toggle-row">
+          <span className="toggle-label">
+            <i className="ti ti-microphone" style={{ marginRight: 6, color: 'var(--primary)' }} />
+            樂樂有跟著唸/唱
+          </span>
+          <button className={'toggle' + (followed ? ' on' : '')} onClick={() => setFollowed(!followed)} />
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title"><i className="ti ti-quote" />學到的句子（選填）</div>
+        <input className="form-input" placeholder="今天學到什麼句子？" value={sentences} onChange={e => setSentences(e.target.value)} />
+      </div>
+
+      <div className="card">
+        <div className="card-title"><i className="ti ti-notes" />媽媽的觀察（選填）</div>
+        <textarea className="form-input" placeholder="有趣的互動、觀察..." value={momNotes} onChange={e => setMomNotes(e.target.value)} />
+      </div>
+
+      {selectedBook && (
+        <div className="card">
+          <hr className="dashed-divider" style={{ margin: '0 0 14px' }} />
+          <div className="toggle-row" style={{ marginBottom: 12 }}>
+            <span className="toggle-label" style={{ fontSize: 13, color: 'var(--text-sub)' }}>
+              更新「{selectedBook.title}」的喜愛度
+            </span>
+            <button className={'toggle' + (updateRating ? ' on' : '')} onClick={() => setUpdateRating(!updateRating)} />
+          </div>
+          {updateRating && (
+            <div>
+              <div className="form-label" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                目前：<Stars rating={selectedBook.rating} size={14} />
+              </div>
+              <StarRating value={newRating || selectedBook.rating} onChange={setNewRating} />
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ padding: '8px 16px 8px' }}>
+        <button className="btn-primary" onClick={handleSave}>
+          <i className="ti ti-device-floppy" /> 儲存紀錄
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   BookLibrary
+═══════════════════════════════════════ */
+function BookLibrary({ books, records, addBook, deleteBook, toast }) {
+  const [openSeries, setOpenSeries] = useState({});
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editBook, setEditBook] = useState(null);
+
+  const [newTitle, setNewTitle] = useState('');
+  const [newAuthor, setNewAuthor] = useState('');
+  const [newSeries, setNewSeries] = useState('');
+  const [newAudio, setNewAudio] = useState('YouTube');
+  const [newNotes, setNewNotes] = useState('');
+  const [newRating, setNewRating] = useState(0);
+
+  const resetForm = () => {
+    setNewTitle(''); setNewAuthor(''); setNewSeries('');
+    setNewAudio('YouTube'); setNewNotes(''); setNewRating(0);
+    setEditBook(null);
+  };
+
+  const openEditBook = (b) => {
+    setEditBook(b);
+    setNewTitle(b.title); setNewAuthor(b.author || '');
+    setNewSeries(b.series || ''); setNewAudio(b.audioSource || 'YouTube');
+    setNewNotes(b.notes || ''); setNewRating(b.rating || 0);
+    setShowAddForm(true);
+    setTimeout(() => document.querySelector('.add-book-form-card') && document.querySelector('.add-book-form-card').scrollIntoView({ behavior: 'smooth' }), 100);
+  };
+
+  const handleSubmit = useCallback(() => {
+    if (!newTitle.trim()) { toast('請輸入書名'); return; }
+    if (editBook) {
+      addBook({ ...editBook, title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), audioSource: newAudio, notes: newNotes.trim(), rating: newRating }, true);
+      toast('書本已更新！');
+    } else {
+      addBook({ id: genId(), title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), audioSource: newAudio, notes: newNotes.trim(), rating: newRating, createdAt: today() });
+      toast('書本已新增！');
+    }
+    resetForm();
+    setShowAddForm(false);
+  }, [newTitle, newAuthor, newSeries, newAudio, newNotes, newRating, editBook, addBook, toast]);
+
+  const { seriesMap, seriesList, standaloneBooks } = useMemo(() => {
+    const sm = {}; const sl = []; const sb = [];
+    books.forEach(b => {
+      if (b.series) {
+        if (!sm[b.series]) { sm[b.series] = []; sl.push(b.series); }
+        sm[b.series].push(b);
+      } else { sb.push(b); }
+    });
+    return { seriesMap: sm, seriesList: [...new Set(sl)], standaloneBooks: sb };
+  }, [books]);
+
+  const getReadCount = (bookId) => records.filter(r => r.bookId === bookId).length;
+  const toggleSeries = (name) => setOpenSeries(prev => ({ ...prev, [name]: !prev[name] }));
+
+  const BookRow = ({ b }) => (
+    <div className="lib-book-row" onClick={() => openEditBook(b)}>
+      <div className="lib-spine" style={{ background: getSpineColor(b.id) }} />
+      <div className="lib-book-info">
+        <div className="lib-book-title">{b.title}</div>
+        {b.author && <div className="lib-book-author">{b.author}</div>}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+        {b.rating > 0 && (
+          <div className="lib-book-stars">
+            {[1,2,3,4,5].map(i => (
+              <i key={i}
+                className={i <= b.rating ? 'ti ti-star-filled' : 'ti ti-star'}
+                style={{ fontSize: 12, color: i <= b.rating ? starColor(b.rating) : '#DDD0C0' }}
+              />
+            ))}
+          </div>
+        )}
+        {getReadCount(b.id) > 0 && (
+          <span style={{ fontSize: 11, color: 'var(--text-light)' }}>
+            <i className="ti ti-headphones" style={{ fontSize: 11 }} /> {getReadCount(b.id)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="page" style={{ paddingBottom: 'calc(var(--nav-h) + 24px)' }}>
+      <div className="page-header">
+        <i className="ti ti-books" style={{ color: 'var(--primary)', fontSize: 22 }} />
+        <div className="page-header-title">書單</div>
+      </div>
+
+      {seriesList.map((series, idx) => {
+        const theme = SERIES_THEMES[idx % SERIES_THEMES.length];
+        const booksInSeries = seriesMap[series];
+        const isOpen = openSeries[series] !== false;
+        return (
+          <div key={series} className="series-block">
+            <div
+              className="series-header"
+              style={{
+                background: theme.bg,
+                borderRadius: isOpen ? '10px 10px 0 0' : '10px',
+                border: '0.5px solid ' + theme.border,
+                borderBottom: isOpen ? 'none' : '0.5px solid ' + theme.border
+              }}
+              onClick={() => toggleSeries(series)}
+            >
+              <div className="series-header-left">
+                <div className="series-dot" style={{ background: theme.dot }} />
+                <span className="series-name" style={{ color: theme.text }}>{series}</span>
+                <span className="series-count" style={{ color: theme.text }}>{booksInSeries.length} 本</span>
+              </div>
+              <i className={'ti ti-chevron-down series-chevron' + (isOpen ? ' open' : '')} style={{ color: theme.dot }} />
+            </div>
+            {isOpen && (
+              <div className="series-books" style={{ borderColor: theme.border }}>
+                {booksInSeries.map(b => <BookRow key={b.id} b={b} />)}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {standaloneBooks.length > 0 && (
+        <>
+          {seriesList.length > 0 && <div className="standalone-header">單本書</div>}
+          <div style={{ margin: '0 16px' }}>
+            <div className="series-books" style={{ borderRadius: 10, border: '0.5px solid var(--card-border)' }}>
+              {standaloneBooks.map(b => <BookRow key={b.id} b={b} />)}
+            </div>
+          </div>
+        </>
+      )}
+
+      {books.length === 0 && (
+        <div className="empty-state">
+          <i className="ti ti-books" />
+          <p>還沒有書喔！<br />點「新增書本」開始建立書單吧</p>
+        </div>
+      )}
+
+      {showAddForm ? (
+        <div className="card add-book-form-card" style={{ marginTop: 16 }}>
+          <div className="card-title">
+            <i className="ti ti-book-plus" />
+            {editBook ? '編輯書本' : '新增書本'}
+          </div>
+          <div className="form-group">
+            <label className="form-label">書名 *</label>
+            <input className="form-input" placeholder="e.g. Green Eggs and Ham" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">作者</label>
+            <input className="form-input" placeholder="作者名稱" value={newAuthor} onChange={e => setNewAuthor(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">系列（選填）</label>
+            <input className="form-input" placeholder="e.g. Pete the Cat" value={newSeries} onChange={e => setNewSeries(e.target.value)} list="series-list" />
+            <datalist id="series-list">
+              {seriesList.map(s => <option key={s} value={s} />)}
+            </datalist>
+          </div>
+          <div className="form-group">
+            <label className="form-label">音源</label>
+            <select className="form-select" value={newAudio} onChange={e => setNewAudio(e.target.value)}>
+              {AUDIO_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">樂樂喜愛度</label>
+            <StarRating value={newRating} onChange={setNewRating} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">備註（選填）</label>
+            <input className="form-input" placeholder="學習重點、特色等" value={newNotes} onChange={e => setNewNotes(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-primary" style={{ flex: 1 }} onClick={handleSubmit}>
+              <i className="ti ti-check" /> {editBook ? '儲存變更' : '新增書本'}
+            </button>
+            <button className="btn-secondary" onClick={() => { setShowAddForm(false); resetForm(); }}>取消</button>
+          </div>
+          {editBook && (
+            <button
+              onClick={() => {
+                if (window.confirm('確定刪除「' + editBook.title + '」？\n相關的共讀紀錄也會一併刪除。')) {
+                  deleteBook(editBook.id);
+                  setShowAddForm(false);
+                  resetForm();
+                  toast('已刪除');
+                }
+              }}
+              style={{
+                marginTop: 10, width: '100%', padding: '10px',
+                background: 'none', border: '1.5px solid #E8A0A0',
+                borderRadius: 12, color: '#C04040',
+                fontSize: 14, fontFamily: 'var(--font-round)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+              }}
+            >
+              <i className="ti ti-trash" /> 刪除這本書
+            </button>
+          )}
+        </div>
+      ) : (
+        <button className="add-book-btn" onClick={() => { resetForm(); setShowAddForm(true); }}>
+          <i className="ti ti-plus" /> 新增書本
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   App (root)
+═══════════════════════════════════════ */
+function App() {
+  const [books, setBooks] = useState(() => {
+    try {
+      const s = localStorage.getItem('lele_books_v2');
+      return s ? JSON.parse(s) : SAMPLE_BOOKS;
+    } catch { return SAMPLE_BOOKS; }
+  });
+  const [records, setRecords] = useState(() => {
+    try {
+      const s = localStorage.getItem('lele_records_v2');
+      return s ? JSON.parse(s) : SAMPLE_RECORDS;
+    } catch { return SAMPLE_RECORDS; }
+  });
+  const [page, setPage] = useState('home');
+  const [navParam, setNavParam] = useState({});
+  const [toastMsg, setToastMsg] = useState('');
+  const [toastKey, setToastKey] = useState(0);
+
+  useEffect(() => { localStorage.setItem('lele_books_v2', JSON.stringify(books)); }, [books]);
+  useEffect(() => { localStorage.setItem('lele_records_v2', JSON.stringify(records)); }, [records]);
+
+  const navigate = useCallback((p, params) => {
+    setPage(p);
+    setNavParam(params || {});
+    window.scrollTo(0, 0);
+  }, []);
+
+  const toast = useCallback((msg) => {
+    setToastMsg(msg);
+    setToastKey(k => k + 1);
+    setTimeout(() => setToastMsg(''), 2200);
+  }, []);
+
+  const addRecord = useCallback((rec) => {
+    setRecords(prev => [rec, ...prev]);
+  }, []);
+
+  const deleteBook = useCallback((bookId) => {
+    setBooks(prev => prev.filter(b => b.id !== bookId));
+    setRecords(prev => prev.filter(r => r.bookId !== bookId));
+  }, []);
+
+  const addBook = useCallback((book, isUpdate) => {
+    if (isUpdate) {
+      setBooks(prev => prev.map(b => b.id === book.id ? book : b));
+    } else {
+      setBooks(prev => [...prev, book]);
+    }
+  }, []);
+
+  return (
+    <div className="app">
+      {page === 'home' && (
+        <Dashboard books={books} records={records} navigate={navigate} />
+      )}
+      {page === 'add' && (
+        <AddRecord
+          books={books}
+          addRecord={addRecord}
+          addBook={addBook}
+          navigate={navigate}
+          toast={toast}
+          initialBookId={navParam.bookId || ''}
+        />
+      )}
+      {page === 'library' && (
+        <BookLibrary books={books} records={records} addBook={addBook} deleteBook={deleteBook} navigate={navigate} toast={toast} />
+      )}
+
+      <nav className="bottom-nav">
+        <button className={'nav-btn' + (page === 'home' ? ' on' : '')} onClick={() => navigate('home')}>
+          <i className="ti ti-home" /><span className="nl">首頁</span>
+        </button>
+        <button className="fab" onClick={() => navigate('add')}>
+          <i className="ti ti-plus" />
+        </button>
+        <button className={'nav-btn' + (page === 'library' ? ' on' : '')} onClick={() => navigate('library')}>
+          <i className="ti ti-books" /><span className="nl">書單</span>
+        </button>
+      </nav>
+
+      {toastMsg && <Toast key={toastKey} msg={toastMsg} />}
+    </div>
+  );
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(e) { return { error: e }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 32, fontFamily: 'sans-serif', color: '#333' }}>
+          <h2>⚠️ 載入錯誤</h2>
+          <pre style={{ marginTop: 12, whiteSpace: 'pre-wrap', fontSize: 13, color: 'red' }}>{String(this.state.error)}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const rootEl = document.getElementById('root');
+rootEl.innerHTML = '<div style="padding:40px;text-align:center;color:#9A7848;font-family:sans-serif">載入中…</div>';
+try {
+  ReactDOM.createRoot(rootEl).render(
+    <ErrorBoundary><App /></ErrorBoundary>
+  );
+} catch(e) {
+  rootEl.innerHTML = '<div style="padding:32px;color:red;font-family:sans-serif"><b>啟動失敗：</b><br>' + e + '</div>';
+}
+</script>
+</body>
+</html>
