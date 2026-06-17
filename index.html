@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js" crossorigin></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js" crossorigin></script>
 <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.10/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -706,20 +707,88 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
   const [pendingImport, setPendingImport] = useState(null);
   const fileInputRef = React.useRef(null);
 
+  const BOOK_COL_MAP = {
+    '書名': 'title', 'title': 'title',
+    '作者': 'author', 'author': 'author',
+    '系列': 'series', 'series': 'series',
+    '音源': 'audioSource', 'audiosource': 'audioSource', 'audio': 'audioSource',
+    '備註': 'notes', 'notes': 'notes',
+    '星星': 'rating', '喜愛度': 'rating', 'rating': 'rating',
+  };
+  const REC_COL_MAP = {
+    '書名': 'bookTitle', 'booktitle': 'bookTitle',
+    '日期': 'date', 'date': 'date',
+    '時間': 'duration', 'duration': 'duration',
+    '反應': 'leloReaction', 'reaction': 'leloReaction',
+    '跟著唸': 'leloFollowed', 'followed': 'leloFollowed',
+    '學到的句子': 'leloSentences', 'sentences': 'leloSentences',
+    '媽媽觀察': 'momNotes', 'momnotes': 'momNotes', '觀察': 'momNotes',
+  };
+
+  const parseSheet = (sheet, colMap) => {
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    return rows.map(row => {
+      const obj = {};
+      Object.entries(row).forEach(([k, v]) => {
+        const mapped = colMap[k] || colMap[k.toLowerCase().trim()];
+        if (mapped) obj[mapped] = v;
+      });
+      return obj;
+    }).filter(obj => Object.keys(obj).length > 0);
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const data = JSON.parse(ev.target.result);
-        if (!data.books && !data.records) { toast('格式不符，請選擇正確的備份檔'); return; }
-        setPendingImport(data);
-        setImportMode('confirm');
-      } catch { toast('讀取失敗，請確認檔案格式'); }
+        if (isExcel) {
+          const wb = XLSX.read(ev.target.result, { type: 'array' });
+          const booksSheet = wb.Sheets[wb.SheetNames[0]];
+          const recsSheet = wb.SheetNames[1] ? wb.Sheets[wb.SheetNames[1]] : null;
+          const parsedBooks = parseSheet(booksSheet, BOOK_COL_MAP).map(b => ({
+            id: genId(), title: b.title || '', author: b.author || '',
+            series: b.series || '', audioSource: b.audioSource || 'YouTube',
+            notes: b.notes || '', rating: parseInt(b.rating) || 0, createdAt: today()
+          })).filter(b => b.title);
+          const parsedRecs = recsSheet ? parseSheet(recsSheet, REC_COL_MAP).map(r => ({
+            id: genId(), bookId: '', bookTitle: r.bookTitle || '',
+            date: r.date || today(), duration: r.duration || '20分鐘',
+            leloReaction: r.leloReaction || '', leloFollowed: r.leloFollowed === true || r.leloFollowed === '是' || r.leloFollowed === 'true',
+            leloSentences: r.leloSentences || '', momNotes: r.momNotes || '', createdAt: today()
+          })).filter(r => r.bookTitle) : [];
+          if (parsedBooks.length === 0) { toast('找不到書單資料，請確認欄位名稱'); return; }
+          setPendingImport({ books: parsedBooks, records: parsedRecs });
+          setImportMode('confirm');
+        } else {
+          const data = JSON.parse(ev.target.result);
+          if (!data.books && !data.records) { toast('格式不符，請選擇正確的備份檔'); return; }
+          setPendingImport(data);
+          setImportMode('confirm');
+        }
+      } catch (err) { toast('讀取失敗：' + err.message); }
     };
-    reader.readAsText(file);
+    if (isExcel) reader.readAsArrayBuffer(file);
+    else reader.readAsText(file);
     e.target.value = '';
+  };
+
+  const downloadTemplate = () => {
+    const wb = XLSX.utils.book_new();
+    const bookData = [
+      ['書名', '作者', '系列', '音源', '備註', '星星'],
+      ['I Love My White Shoes', 'James Dean', 'Pete the Cat', 'YouTube', '', 5],
+      ['Brown Bear, Brown Bear', 'Bill Martin Jr.', '', 'YouTube', '重複句型好學', 4],
+    ];
+    const recData = [
+      ['書名', '日期', '時間', '反應', '跟著唸', '學到的句子', '媽媽觀察'],
+      ['I Love My White Shoes', '2026-06-10', '20分鐘', 'love', '是', 'no matter what', ''],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bookData), '書單');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(recData), '共讀紀錄');
+    XLSX.writeFile(wb, 'lele-reading-template.xlsx');
   };
 
   const [newTitle, setNewTitle] = useState('');
@@ -812,8 +881,14 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
           <button onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 20, border: '1.5px solid var(--primary)', background: '#F5E8DA', color: 'var(--primary-dark)', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>
             <i className="ti ti-upload" /> 匯入
           </button>
-          <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileChange} />
+          <input ref={fileInputRef} type="file" accept=".json,.xlsx,.xls" style={{ display: 'none' }} onChange={handleFileChange} />
         </div>
+      </div>
+
+      <div style={{ padding: '0 16px 10px', display: 'flex', justifyContent: 'flex-end' }}>
+        <button onClick={downloadTemplate} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 16, border: 'none', background: 'none', color: 'var(--text-light)', fontSize: 12, fontFamily: 'var(--font-round)', cursor: 'pointer', textDecoration: 'underline' }}>
+          <i className="ti ti-file-spreadsheet" /> 下載 Excel 範本
+        </button>
       </div>
 
       {importMode === 'confirm' && pendingImport && (
