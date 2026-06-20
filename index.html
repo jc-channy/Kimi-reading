@@ -481,6 +481,7 @@ const REACTION_OPTIONS = [
 
 const SAMPLE_BOOKS = [];
 const SAMPLE_RECORDS = [];
+const HEADERS = ['書名','作者','系列','書本備註','星星','已畢業','日期','時間','反應','跟著唸','學到的句子','媽媽觀察'];
 
 function today() {
   return new Date().toISOString().slice(0,10);
@@ -542,7 +543,34 @@ function Toast({ msg }) {
 ═══════════════════════════════════════ */
 function Dashboard({ books, records, navigate }) {
   const totalDays = useMemo(() => new Set(records.map(r => r.date)).size, [records]);
-  const totalMins = useMemo(() => records.reduce((s, r) => s + (parseInt(r.duration) || 0), 0), [records]);
+
+  const streak = useMemo(() => {
+    if (records.length === 0) return 0;
+    const readDates = new Set(records.map(r => r.date));
+    let count = 0;
+    const d = new Date();
+    while (true) {
+      const ds = d.toISOString().slice(0, 10);
+      if (readDates.has(ds)) { count++; d.setDate(d.getDate() - 1); }
+      else break;
+    }
+    return count;
+  }, [records]);
+
+  const thisMonth = useMemo(() => {
+    const prefix = today().slice(0, 7);
+    return records.filter(r => r.date && r.date.startsWith(prefix)).length;
+  }, [records]);
+
+  const top3 = useMemo(() => {
+    const countMap = {};
+    records.forEach(r => { countMap[r.bookId] = (countMap[r.bookId] || 0) + 1; });
+    return books
+      .map(b => ({ ...b, readCount: countMap[b.id] || 0 }))
+      .filter(b => b.readCount > 0)
+      .sort((a, z) => z.readCount - a.readCount)
+      .slice(0, 3);
+  }, [books, records]);
 
   const booksWithMeta = useMemo(() => {
     return books.map(b => {
@@ -569,9 +597,15 @@ function Dashboard({ books, records, navigate }) {
             <i className="ti ti-books" />
             {books.length}<span>本書</span>
           </div>
+          {streak > 0 && (
+            <div className="stat-pill">
+              <i className="ti ti-flame" style={{ color: '#E87840' }} />
+              {streak}<span>連續天</span>
+            </div>
+          )}
           <div className="stat-pill">
-            <i className="ti ti-clock" />
-            {totalMins}<span>分鐘</span>
+            <i className="ti ti-calendar-month" />
+            {thisMonth}<span>本月</span>
           </div>
         </div>
         <button className="hero-cta" onClick={() => navigate('add')}>
@@ -579,8 +613,36 @@ function Dashboard({ books, records, navigate }) {
         </button>
       </div>
 
+      {top3.length > 0 && (
+        <>
+          <div className="section">
+            <div className="section-title">共讀 Top 3</div>
+          </div>
+          <div style={{ padding: '0 16px 4px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {top3.map((b, idx) => (
+              <div key={b.id} onClick={() => navigate('add', { bookId: b.id })}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                  background: 'var(--card)', border: '0.5px solid var(--card-border)',
+                  borderRadius: 12, cursor: 'pointer' }}>
+                <span style={{ fontSize: 18, fontWeight: 800, color: idx === 0 ? '#E8A840' : idx === 1 ? '#A0A0A0' : '#C87840', width: 24, textAlign: 'center', flexShrink: 0 }}>
+                  {idx + 1}
+                </span>
+                <div className="book-spine" style={{ background: getSpineColor(b.id), width: 5, borderRadius: 2, alignSelf: 'stretch' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</div>
+                  {b.author && <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{b.author}</div>}
+                </div>
+                <div className="book-count-badge">
+                  <i className="ti ti-headphones" style={{ fontSize: 12 }} /> {b.readCount}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       <div className="section">
-        <div className="section-title">共讀書單</div>
+        <div className="section-title">最近共讀</div>
       </div>
 
       {booksWithMeta.length === 0 ? (
@@ -807,12 +869,13 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
 /* ═══════════════════════════════════════
    BookLibrary
 ═══════════════════════════════════════ */
-function BookLibrary({ books, records, addBook, deleteBook, exportData, importData, toast }) {
+function BookLibrary({ books, records, addBook, deleteBook, exportData, importData, toast, navigate }) {
   const [openSeries, setOpenSeries] = useState({});
   const [showAddForm, setShowAddForm] = useState(false);
   const [editBook, setEditBook] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [importMode, setImportMode] = useState(null); // null | 'confirm' — holds parsed data
+  const [showGraduated, setShowGraduated] = useState(false);
+  const [importMode, setImportMode] = useState(null);
   const [pendingImport, setPendingImport] = useState(null);
   const fileInputRef = React.useRef(null);
 
@@ -822,6 +885,7 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
     '系列': 'series', 'series': 'series',
     '書本備註': 'notes', '備註': 'notes', 'notes': 'notes',
     '星星': 'rating', 'rating': 'rating',
+    '已畢業': 'graduated', 'graduated': 'graduated',
     '日期': 'date', 'date': 'date',
     '時間': 'duration', 'duration': 'duration',
     '反應': 'leloReaction', 'reaction': 'leloReaction',
@@ -842,38 +906,65 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
     }).filter(obj => Object.keys(obj).length > 0);
   };
 
+  const processRows = (rows) => {
+    if (rows.length === 0) { toast('找不到資料，請確認欄位名稱'); return; }
+    const bookByTitle = {};
+    rows.forEach(r => {
+      if (!bookByTitle[r.title]) {
+        bookByTitle[r.title] = {
+          id: genId(), title: r.title, author: r.author||'', series: r.series||'',
+          notes: r.notes||'', rating: parseInt(r.rating)||0,
+          graduated: r.graduated === '是' || r.graduated === true,
+          createdAt: today()
+        };
+      } else if (r.rating) {
+        bookByTitle[r.title].rating = parseInt(r.rating) || bookByTitle[r.title].rating;
+      }
+    });
+    const parsedBooks = Object.values(bookByTitle);
+    const parsedRecs = [];
+    rows.filter(r => r.date).forEach(r => {
+      const dates = String(r.date).split(',').map(d => d.trim()).filter(Boolean).sort();
+      const latestDate = dates[dates.length - 1];
+      dates.forEach(d => {
+        const isLatest = d === latestDate;
+        parsedRecs.push({
+          id: genId(), bookId: bookByTitle[r.title]?.id || '', bookTitle: r.title,
+          date: d, duration: isLatest ? (r.duration || '20分鐘') : '',
+          leloReaction: isLatest ? (r.leloReaction || '') : '',
+          leloFollowed: isLatest ? (r.leloFollowed === true || r.leloFollowed === '是') : false,
+          leloSentences: isLatest ? (r.leloSentences || '') : '',
+          momNotes: isLatest ? (r.momNotes || '') : '', createdAt: today()
+        });
+      });
+    });
+    setPendingImport({ books: parsedBooks, records: parsedRecs });
+    setImportMode('confirm');
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
+    const isCsv = file.name.toLowerCase().endsWith('.csv');
     reader.onload = (ev) => {
       try {
-        const wb = XLSX.read(ev.target.result, { type: 'array' });
+        let wb;
+        if (isCsv) {
+          wb = XLSX.read(ev.target.result, { type: 'string' });
+        } else {
+          wb = XLSX.read(ev.target.result, { type: 'array' });
+        }
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows = parseSheet(sheet, ROW_COL_MAP).filter(r => r.title);
-        if (rows.length === 0) { toast('找不到資料，請確認欄位名稱'); return; }
-        // Deduplicate books by title
-        const bookByTitle = {};
-        rows.forEach(r => {
-          if (!bookByTitle[r.title]) {
-            bookByTitle[r.title] = { id: genId(), title: r.title, author: r.author||'', series: r.series||'', notes: r.notes||'', rating: parseInt(r.rating)||0, createdAt: today() };
-          } else if (r.rating) {
-            bookByTitle[r.title].rating = parseInt(r.rating) || bookByTitle[r.title].rating;
-          }
-        });
-        const parsedBooks = Object.values(bookByTitle);
-        const parsedRecs = rows.filter(r => r.date).map(r => ({
-          id: genId(), bookId: bookByTitle[r.title]?.id || '', bookTitle: r.title,
-          date: r.date || today(), duration: r.duration || '20分鐘',
-          leloReaction: r.leloReaction || '',
-          leloFollowed: r.leloFollowed === true || r.leloFollowed === '是' || r.leloFollowed === 'true',
-          leloSentences: r.leloSentences || '', momNotes: r.momNotes || '', createdAt: today()
-        }));
-        setPendingImport({ books: parsedBooks, records: parsedRecs });
-        setImportMode('confirm');
+        processRows(rows);
       } catch (err) { toast('讀取失敗：' + err.message); }
     };
-    reader.readAsArrayBuffer(file);
+    if (isCsv) {
+      reader.readAsText(file, 'UTF-8');
+    } else {
+      reader.readAsArrayBuffer(file);
+    }
     e.target.value = '';
   };
 
@@ -881,10 +972,10 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
     const wb = XLSX.utils.book_new();
     const data = [
       HEADERS,
-      ['I Love My White Shoes', 'James Dean', 'Pete the Cat', 'YouTube', '', 5, '2026-06-10', '20分鐘', 'love', '是', 'no matter what', ''],
-      ['I Love My White Shoes', 'James Dean', 'Pete the Cat', 'YouTube', '', 5, '2026-06-15', '20分鐘', 'love', '是', '', '很喜歡唱'],
-      ['Brown Bear, Brown Bear', 'Bill Martin Jr.', '', 'YouTube', '重複句型好學', 4, '2026-06-12', '15分鐘', 'like', '是', 'What do you see?', ''],
-      ['The Very Hungry Caterpillar', 'Eric Carle', '', 'CD', '', 3, '', '', '', '', '', ''],
+      ['I Love My White Shoes', 'James Dean', 'Pete the Cat', '重複句型', 5, '', '2026-06-10', '20分鐘', 'love', '是', 'no matter what', ''],
+      ['I Love My White Shoes', 'James Dean', 'Pete the Cat', '重複句型', 5, '', '2026-06-15,2026-06-17', '20分鐘', 'love', '是', '', '很喜歡唱'],
+      ['Brown Bear, Brown Bear', 'Bill Martin Jr.', '', '重複句型好學', 4, '', '2026-06-12', '15分鐘', 'like', '是', 'What do you see?', ''],
+      ['The Very Hungry Caterpillar', 'Eric Carle', '', '', 3, '是', '', '', '', '', '', ''],
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), '共讀紀錄');
     XLSX.writeFile(wb, 'lele-reading-template.xlsx');
@@ -895,6 +986,7 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
   const [newSeries, setNewSeries] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [newRating, setNewRating] = useState(0);
+  const [graduatedFlag, setGraduatedFlag] = useState(false);
 
   // Auto-fill notes from last book in same series (only when adding, not editing)
   useEffect(() => {
@@ -910,14 +1002,14 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
 
   const resetForm = () => {
     setNewTitle(''); setNewAuthor(''); setNewSeries('');
-    setNewNotes(''); setNewRating(0); setEditBook(null);
+    setNewNotes(''); setNewRating(0); setGraduatedFlag(false); setEditBook(null);
   };
 
   const openEditBook = (b) => {
     setEditBook(b);
     setNewTitle(b.title); setNewAuthor(b.author || '');
     setNewSeries(b.series || ''); setNewNotes(b.notes || '');
-    setNewRating(b.rating || 0);
+    setNewRating(b.rating || 0); setGraduatedFlag(b.graduated || false);
     setShowAddForm(true);
     setTimeout(() => document.querySelector('.add-book-form-card') && document.querySelector('.add-book-form-card').scrollIntoView({ behavior: 'smooth' }), 100);
   };
@@ -925,15 +1017,15 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
   const handleSubmit = useCallback(() => {
     if (!newTitle.trim()) { toast('請輸入書名'); return; }
     if (editBook) {
-      addBook({ ...editBook, title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), notes: newNotes.trim(), rating: newRating }, true);
+      addBook({ ...editBook, title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), notes: newNotes.trim(), rating: newRating, graduated: graduatedFlag }, true);
       toast('書本已更新！');
     } else {
-      addBook({ id: genId(), title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), notes: newNotes.trim(), rating: 0, createdAt: today() });
+      addBook({ id: genId(), title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), notes: newNotes.trim(), rating: 0, graduated: false, createdAt: today() });
       toast('書本已新增！');
     }
     resetForm();
     setShowAddForm(false);
-  }, [newTitle, newAuthor, newSeries, newNotes, newRating, editBook, addBook, toast]);
+  }, [newTitle, newAuthor, newSeries, newNotes, newRating, graduatedFlag, editBook, addBook, toast]);
 
   const filteredBooks = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -941,16 +1033,19 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
     return books.filter(b => b.title.toLowerCase().includes(q) || (b.author || '').toLowerCase().includes(q) || (b.series || '').toLowerCase().includes(q));
   }, [books, searchQuery]);
 
+  const activeFiltered = useMemo(() => filteredBooks.filter(b => !b.graduated), [filteredBooks]);
+  const graduatedFiltered = useMemo(() => filteredBooks.filter(b => b.graduated), [filteredBooks]);
+
   const { seriesMap, seriesList, standaloneBooks } = useMemo(() => {
     const sm = {}; const sl = []; const sb = [];
-    filteredBooks.forEach(b => {
+    activeFiltered.forEach(b => {
       if (b.series) {
         if (!sm[b.series]) { sm[b.series] = []; sl.push(b.series); }
         sm[b.series].push(b);
       } else { sb.push(b); }
     });
     return { seriesMap: sm, seriesList: [...new Set(sl)], standaloneBooks: sb };
-  }, [filteredBooks]);
+  }, [activeFiltered]);
 
   const getReadCount = (bookId) => records.filter(r => r.bookId === bookId).length;
   const toggleSeries = (name) => setOpenSeries(prev => ({ ...prev, [name]: !prev[name] }));
@@ -959,7 +1054,10 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
     <div className="lib-book-row" onClick={() => openEditBook(b)}>
       <div className="lib-spine" style={{ background: getSpineColor(b.id) }} />
       <div className="lib-book-info">
-        <div className="lib-book-title">{b.title}</div>
+        <div className="lib-book-title">
+          {b.title}
+          {b.graduated && <span style={{ fontSize: 11, marginLeft: 5, verticalAlign: 'middle' }}>🎓</span>}
+        </div>
         {b.author && <div className="lib-book-author">{b.author}</div>}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
@@ -977,6 +1075,12 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
           <span style={{ fontSize: 11, color: 'var(--text-light)' }}>
             <i className="ti ti-headphones" style={{ fontSize: 11 }} /> {getReadCount(b.id)}
           </span>
+        )}
+        {navigate && (
+          <button
+            onClick={(e) => { e.stopPropagation(); navigate('add', { bookId: b.id }); }}
+            style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, border: '1px solid var(--primary)', background: '#F5E8DA', color: 'var(--primary-dark)', cursor: 'pointer', fontFamily: 'var(--font-round)' }}
+          >+ 記錄</button>
         )}
       </div>
     </div>
@@ -996,7 +1100,7 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
           <button onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 20, border: '1.5px solid var(--primary)', background: '#F5E8DA', color: 'var(--primary-dark)', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>
             <i className="ti ti-upload" /> 匯入
           </button>
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleFileChange} />
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFileChange} />
         </div>
       </div>
 
@@ -1100,6 +1204,26 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
         </div>
       )}
 
+      {graduatedFiltered.length > 0 && (
+        <div style={{ margin: '8px 16px 0' }}>
+          <button
+            onClick={() => setShowGraduated(g => !g)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 14px', borderRadius: showGraduated ? '10px 10px 0 0' : 10,
+              border: '0.5px solid #C8C0B0', background: '#F5F0E8',
+              cursor: 'pointer', fontFamily: 'var(--font-round)', color: 'var(--text-sub)' }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 700 }}>🎓 已畢業 · {graduatedFiltered.length} 本</span>
+            <i className={'ti ti-chevron-' + (showGraduated ? 'up' : 'down')} style={{ fontSize: 16 }} />
+          </button>
+          {showGraduated && (
+            <div className="series-books" style={{ borderRadius: '0 0 10px 10px', border: '0.5px solid #C8C0B0', borderTop: 'none', opacity: 0.8 }}>
+              {graduatedFiltered.map(b => <BookRow key={b.id} b={b} />)}
+            </div>
+          )}
+        </div>
+      )}
+
       {showAddForm ? (
         <div className="card add-book-form-card" style={{ marginTop: 16 }}>
           <div className="card-title">
@@ -1131,6 +1255,15 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
             <label className="form-label">備註（選填）</label>
             <input className="form-input" placeholder="學習重點、特色等" value={newNotes} onChange={e => setNewNotes(e.target.value)} />
           </div>
+          {editBook && (
+            <div className="toggle-row" style={{ marginBottom: 16 }}>
+              <span className="toggle-label" style={{ fontSize: 13 }}>
+                <i className="ti ti-school" style={{ marginRight: 6, color: 'var(--primary)' }} />
+                標記為已畢業
+              </span>
+              <button className={'toggle' + (graduatedFlag ? ' on' : '')} onClick={() => setGraduatedFlag(f => !f)} />
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn-primary" style={{ flex: 1 }} onClick={handleSubmit}>
               <i className="ti ti-check" /> {editBook ? '儲存變更' : '新增書本'}
@@ -1184,6 +1317,24 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
   const totalDays = useMemo(() => new Set(records.map(r => r.date)).size, [records]);
   const totalSessions = records.length;
 
+  const streak = useMemo(() => {
+    if (records.length === 0) return 0;
+    const readDates = new Set(records.map(r => r.date));
+    let count = 0;
+    const d = new Date();
+    while (true) {
+      const ds = d.toISOString().slice(0, 10);
+      if (readDates.has(ds)) { count++; d.setDate(d.getDate() - 1); }
+      else break;
+    }
+    return count;
+  }, [records]);
+
+  const thisMonth = useMemo(() => {
+    const prefix = today().slice(0, 7);
+    return records.filter(r => r.date && r.date.startsWith(prefix)).length;
+  }, [records]);
+
   const booksWithMeta = useMemo(() => {
     return books.map(b => {
       const recs = records.filter(r => r.bookId === b.id).sort((a,z) => z.date.localeCompare(a.date));
@@ -1195,8 +1346,12 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
     });
   }, [books, records]);
 
-  // Custom navigate for panel: closing panel acts as going 'home'
   const panelNavigate = useCallback(() => closePanel(), [closePanel]);
+  // Library navigate: intercept 'add' to open panel instead of routing
+  const libraryNavigate = useCallback((p, params) => {
+    if (p === 'add') { openPanel(params?.bookId || ''); }
+    else { navigate(p); }
+  }, [navigate, openPanel]);
 
   return (
     <div className="d-layout">
@@ -1227,6 +1382,16 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
           <div className="d-stat-row">
             <span className="d-stat-label"><i className="ti ti-headphones" />共讀次數</span>
             <span className="d-stat-val">{totalSessions}</span>
+          </div>
+          {streak > 0 && (
+            <div className="d-stat-row">
+              <span className="d-stat-label"><i className="ti ti-flame" style={{ color: '#E87840' }} />連續天數</span>
+              <span className="d-stat-val" style={{ color: '#E87840' }}>{streak} 🔥</span>
+            </div>
+          )}
+          <div className="d-stat-row">
+            <span className="d-stat-label"><i className="ti ti-calendar-month" />本月次數</span>
+            <span className="d-stat-val">{thisMonth}</span>
           </div>
         </div>
         <button className="d-add-btn" onClick={() => openPanel('')}>
@@ -1285,7 +1450,7 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
             books={books} records={records}
             addBook={addBook} deleteBook={deleteBook}
             exportData={exportData} importData={importData}
-            navigate={navigate} toast={toast}
+            navigate={libraryNavigate} toast={toast}
           />
         )}
       </main>
@@ -1373,25 +1538,21 @@ function App() {
     }
   }, []);
 
-  const HEADERS = ['書名','作者','系列','書本備註','星星','日期','時間','反應','跟著唸','學到的句子','媽媽觀察'];
-
   const exportData = useCallback(() => {
     const wb = XLSX.utils.book_new();
     const rows = [HEADERS];
-    // Books with records
     const bookMap = Object.fromEntries(books.map(b => [b.id, b]));
     const coveredBookIds = new Set();
     records.forEach(r => {
       const b = bookMap[r.bookId] || {};
       coveredBookIds.add(r.bookId);
       rows.push([
-        b.title || r.bookTitle, b.author||'', b.series||'', b.notes||'', b.rating||0,
+        b.title || r.bookTitle, b.author||'', b.series||'', b.notes||'', b.rating||0, b.graduated ? '是' : '',
         r.date, r.duration, r.leloReaction||'', r.leloFollowed ? '是' : '否', r.leloSentences||'', r.momNotes||''
       ]);
     });
-    // Books with no records
     books.filter(b => !coveredBookIds.has(b.id)).forEach(b => {
-      rows.push([b.title, b.author||'', b.series||'', b.notes||'', b.rating||0, '','','','','','']);
+      rows.push([b.title, b.author||'', b.series||'', b.notes||'', b.rating||0, b.graduated ? '是' : '', '','','','','','']);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), '共讀紀錄');
     XLSX.writeFile(wb, 'lele-reading-' + today() + '.xlsx');
