@@ -478,7 +478,6 @@ const REACTION_OPTIONS = [
   { value: 'ok', label: '還好', icon: 'mood-neutral' },
   { value: 'skip', label: '不感興趣', icon: 'mood-sad' },
 ];
-const AUDIO_SOURCES = ['YouTube', 'Spotify', 'Apple Music', 'CD', '其他'];
 
 const SAMPLE_BOOKS = [];
 const SAMPLE_RECORDS = [];
@@ -638,9 +637,18 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
   const [newTitle, setNewTitle] = useState('');
   const [newAuthor, setNewAuthor] = useState('');
   const [newSeries, setNewSeries] = useState('');
-  const [newAudio, setNewAudio] = useState('YouTube');
   const [newNotes, setNewNotes] = useState('');
-  const [newBookRating, setNewBookRating] = useState(0);
+
+  // Auto-fill notes from last book in same series
+  useEffect(() => {
+    const s = newSeries.trim();
+    if (!s) return;
+    const seriesBooks = books.filter(b => b.series === s);
+    if (seriesBooks.length > 0) {
+      const last = seriesBooks[seriesBooks.length - 1];
+      if (last.notes) setNewNotes(last.notes);
+    }
+  }, [newSeries, books]);
 
   const selectedBook = useMemo(() => books.find(b => b.id === bookId), [books, bookId]);
 
@@ -665,16 +673,14 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
     if (!newTitle.trim()) { toast('請輸入書名'); return; }
     const b = {
       id: genId(), title: newTitle.trim(), author: newAuthor.trim(),
-      series: newSeries.trim(), audioSource: newAudio,
-      notes: newNotes.trim(), rating: newBookRating, createdAt: today()
+      series: newSeries.trim(), notes: newNotes.trim(), rating: 0, createdAt: today()
     };
     addBook(b);
     setBookId(b.id);
     setAddingBook(false);
-    setNewTitle(''); setNewAuthor(''); setNewSeries('');
-    setNewAudio('YouTube'); setNewNotes(''); setNewBookRating(0);
+    setNewTitle(''); setNewAuthor(''); setNewSeries(''); setNewNotes('');
     toast('書本已新增！');
-  }, [newTitle, newAuthor, newSeries, newAudio, newNotes, newBookRating, addBook, toast]);
+  }, [newTitle, newAuthor, newSeries, newNotes, addBook, toast]);
 
   return (
     <div className="page" style={{ paddingBottom: 'calc(var(--nav-h) + 16px)' }}>
@@ -714,16 +720,6 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
             <div className="form-group">
               <label className="form-label">系列（選填）</label>
               <input className="form-input" placeholder="e.g. Pete the Cat" value={newSeries} onChange={e => setNewSeries(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">音源</label>
-              <select className="form-select" value={newAudio} onChange={e => setNewAudio(e.target.value)}>
-                {AUDIO_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">樂樂喜愛度</label>
-              <StarRating value={newBookRating} onChange={setNewBookRating} />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">備註（選填）</label>
@@ -823,7 +819,6 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
     '書名': 'title', 'title': 'title',
     '作者': 'author', 'author': 'author',
     '系列': 'series', 'series': 'series',
-    '音源': 'audioSource', 'audiosource': 'audioSource',
     '書本備註': 'notes', '備註': 'notes', 'notes': 'notes',
     '星星': 'rating', 'rating': 'rating',
     '日期': 'date', 'date': 'date',
@@ -860,7 +855,7 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
         const bookByTitle = {};
         rows.forEach(r => {
           if (!bookByTitle[r.title]) {
-            bookByTitle[r.title] = { id: genId(), title: r.title, author: r.author||'', series: r.series||'', audioSource: r.audioSource||'YouTube', notes: r.notes||'', rating: parseInt(r.rating)||0, createdAt: today() };
+            bookByTitle[r.title] = { id: genId(), title: r.title, author: r.author||'', series: r.series||'', notes: r.notes||'', rating: parseInt(r.rating)||0, createdAt: today() };
           } else if (r.rating) {
             bookByTitle[r.title].rating = parseInt(r.rating) || bookByTitle[r.title].rating;
           }
@@ -897,21 +892,31 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
   const [newTitle, setNewTitle] = useState('');
   const [newAuthor, setNewAuthor] = useState('');
   const [newSeries, setNewSeries] = useState('');
-  const [newAudio, setNewAudio] = useState('YouTube');
   const [newNotes, setNewNotes] = useState('');
   const [newRating, setNewRating] = useState(0);
 
+  // Auto-fill notes from last book in same series (only when adding, not editing)
+  useEffect(() => {
+    if (editBook) return;
+    const s = newSeries.trim();
+    if (!s) return;
+    const seriesBooks = books.filter(b => b.series === s);
+    if (seriesBooks.length > 0) {
+      const last = seriesBooks[seriesBooks.length - 1];
+      if (last.notes) setNewNotes(last.notes);
+    }
+  }, [newSeries, books, editBook]);
+
   const resetForm = () => {
     setNewTitle(''); setNewAuthor(''); setNewSeries('');
-    setNewAudio('YouTube'); setNewNotes(''); setNewRating(0);
-    setEditBook(null);
+    setNewNotes(''); setNewRating(0); setEditBook(null);
   };
 
   const openEditBook = (b) => {
     setEditBook(b);
     setNewTitle(b.title); setNewAuthor(b.author || '');
-    setNewSeries(b.series || ''); setNewAudio(b.audioSource || 'YouTube');
-    setNewNotes(b.notes || ''); setNewRating(b.rating || 0);
+    setNewSeries(b.series || ''); setNewNotes(b.notes || '');
+    setNewRating(b.rating || 0);
     setShowAddForm(true);
     setTimeout(() => document.querySelector('.add-book-form-card') && document.querySelector('.add-book-form-card').scrollIntoView({ behavior: 'smooth' }), 100);
   };
@@ -919,15 +924,15 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
   const handleSubmit = useCallback(() => {
     if (!newTitle.trim()) { toast('請輸入書名'); return; }
     if (editBook) {
-      addBook({ ...editBook, title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), audioSource: newAudio, notes: newNotes.trim(), rating: newRating }, true);
+      addBook({ ...editBook, title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), notes: newNotes.trim(), rating: newRating }, true);
       toast('書本已更新！');
     } else {
-      addBook({ id: genId(), title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), audioSource: newAudio, notes: newNotes.trim(), rating: newRating, createdAt: today() });
+      addBook({ id: genId(), title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), notes: newNotes.trim(), rating: 0, createdAt: today() });
       toast('書本已新增！');
     }
     resetForm();
     setShowAddForm(false);
-  }, [newTitle, newAuthor, newSeries, newAudio, newNotes, newRating, editBook, addBook, toast]);
+  }, [newTitle, newAuthor, newSeries, newNotes, newRating, editBook, addBook, toast]);
 
   const { seriesMap, seriesList, standaloneBooks } = useMemo(() => {
     const sm = {}; const sl = []; const sb = [];
@@ -1090,16 +1095,12 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
               {seriesList.map(s => <option key={s} value={s} />)}
             </datalist>
           </div>
-          <div className="form-group">
-            <label className="form-label">音源</label>
-            <select className="form-select" value={newAudio} onChange={e => setNewAudio(e.target.value)}>
-              {AUDIO_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">樂樂喜愛度</label>
-            <StarRating value={newRating} onChange={setNewRating} />
-          </div>
+          {editBook && (
+            <div className="form-group">
+              <label className="form-label">樂樂喜愛度</label>
+              <StarRating value={newRating} onChange={setNewRating} />
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label">備註（選填）</label>
             <input className="form-input" placeholder="學習重點、特色等" value={newNotes} onChange={e => setNewNotes(e.target.value)} />
@@ -1346,7 +1347,7 @@ function App() {
     }
   }, []);
 
-  const HEADERS = ['書名','作者','系列','音源','書本備註','星星','日期','時間','反應','跟著唸','學到的句子','媽媽觀察'];
+  const HEADERS = ['書名','作者','系列','書本備註','星星','日期','時間','反應','跟著唸','學到的句子','媽媽觀察'];
 
   const exportData = useCallback(() => {
     const wb = XLSX.utils.book_new();
@@ -1358,13 +1359,13 @@ function App() {
       const b = bookMap[r.bookId] || {};
       coveredBookIds.add(r.bookId);
       rows.push([
-        b.title || r.bookTitle, b.author||'', b.series||'', b.audioSource||'', b.notes||'', b.rating||0,
+        b.title || r.bookTitle, b.author||'', b.series||'', b.notes||'', b.rating||0,
         r.date, r.duration, r.leloReaction||'', r.leloFollowed ? '是' : '否', r.leloSentences||'', r.momNotes||''
       ]);
     });
     // Books with no records
     books.filter(b => !coveredBookIds.has(b.id)).forEach(b => {
-      rows.push([b.title, b.author||'', b.series||'', b.audioSource||'', b.notes||'', b.rating||0, '','','','','','']);
+      rows.push([b.title, b.author||'', b.series||'', b.notes||'', b.rating||0, '','','','','','']);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), '共讀紀錄');
     XLSX.writeFile(wb, 'lele-reading-' + today() + '.xlsx');
