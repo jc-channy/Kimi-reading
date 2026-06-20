@@ -698,6 +698,7 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
   const [momNotes, setMomNotes] = useState('');
   const [updateRating, setUpdateRating] = useState(false);
   const [newRating, setNewRating] = useState(0);
+  const [markGraduated, setMarkGraduated] = useState(false);
 
   const [addingBook, setAddingBook] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -717,6 +718,7 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
   }, [newSeries, books]);
 
   const selectedBook = useMemo(() => books.find(b => b.id === bookId), [books, bookId]);
+  useEffect(() => { setMarkGraduated(selectedBook?.graduated || false); }, [selectedBook]);
 
   const handleSave = useCallback(() => {
     if (!bookId) { toast('請選擇書本'); return; }
@@ -728,8 +730,11 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
       momNotes, createdAt: today()
     };
     addRecord(rec);
-    if (updateRating && newRating > 0 && selectedBook) {
-      addBook({ ...selectedBook, rating: newRating }, true);
+    if (selectedBook) {
+      const needsUpdate = (updateRating && newRating > 0) || (markGraduated !== (selectedBook.graduated || false));
+      if (needsUpdate) {
+        addBook({ ...selectedBook, rating: (updateRating && newRating > 0) ? newRating : selectedBook.rating, graduated: markGraduated }, true);
+      }
     }
     toast('✓ 紀錄已儲存！');
     navigate('home');
@@ -846,7 +851,14 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
           <hr className="dashed-divider" style={{ margin: '0 0 14px' }} />
           <div className="toggle-row" style={{ marginBottom: 12 }}>
             <span className="toggle-label" style={{ fontSize: 13, color: 'var(--text-sub)' }}>
-              更新「{selectedBook.title}」的喜愛度
+              <i className="ti ti-school" style={{ marginRight: 6, color: 'var(--primary)' }} />
+              標記「{selectedBook.title}」已畢業
+            </span>
+            <button className={'toggle' + (markGraduated ? ' on' : '')} onClick={() => setMarkGraduated(g => !g)} />
+          </div>
+          <div className="toggle-row" style={{ marginBottom: 12 }}>
+            <span className="toggle-label" style={{ fontSize: 13, color: 'var(--text-sub)' }}>
+              更新喜愛度
             </span>
             <button className={'toggle' + (updateRating ? ' on' : '')} onClick={() => setUpdateRating(!updateRating)} />
           </div>
