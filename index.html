@@ -811,6 +811,7 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
   const [openSeries, setOpenSeries] = useState({});
   const [showAddForm, setShowAddForm] = useState(false);
   const [editBook, setEditBook] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [importMode, setImportMode] = useState(null); // null | 'confirm' — holds parsed data
   const [pendingImport, setPendingImport] = useState(null);
   const fileInputRef = React.useRef(null);
@@ -934,16 +935,22 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
     setShowAddForm(false);
   }, [newTitle, newAuthor, newSeries, newNotes, newRating, editBook, addBook, toast]);
 
+  const filteredBooks = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return books;
+    return books.filter(b => b.title.toLowerCase().includes(q) || (b.author || '').toLowerCase().includes(q) || (b.series || '').toLowerCase().includes(q));
+  }, [books, searchQuery]);
+
   const { seriesMap, seriesList, standaloneBooks } = useMemo(() => {
     const sm = {}; const sl = []; const sb = [];
-    books.forEach(b => {
+    filteredBooks.forEach(b => {
       if (b.series) {
         if (!sm[b.series]) { sm[b.series] = []; sl.push(b.series); }
         sm[b.series].push(b);
       } else { sb.push(b); }
     });
     return { seriesMap: sm, seriesList: [...new Set(sl)], standaloneBooks: sb };
-  }, [books]);
+  }, [filteredBooks]);
 
   const getReadCount = (bookId) => records.filter(r => r.bookId === bookId).length;
   const toggleSeries = (name) => setOpenSeries(prev => ({ ...prev, [name]: !prev[name] }));
@@ -993,9 +1000,22 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
         </div>
       </div>
 
-      <div style={{ padding: '0 16px 10px', display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={downloadTemplate} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 16, border: 'none', background: 'none', color: 'var(--text-light)', fontSize: 12, fontFamily: 'var(--font-round)', cursor: 'pointer', textDecoration: 'underline' }}>
-          <i className="ti ti-file-spreadsheet" /> 下載 Excel 範本
+      <div style={{ padding: '0 16px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <i className="ti ti-search" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)', fontSize: 15, pointerEvents: 'none' }} />
+          <input
+            className="form-input"
+            placeholder="搜尋書名、作者、系列…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{ paddingLeft: 32, paddingTop: 7, paddingBottom: 7, fontSize: 13 }}
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-light)', fontSize: 16, padding: 0, lineHeight: 1 }}>×</button>
+          )}
+        </div>
+        <button onClick={downloadTemplate} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 16, border: 'none', background: 'none', color: 'var(--text-light)', fontSize: 12, fontFamily: 'var(--font-round)', cursor: 'pointer', textDecoration: 'underline', flexShrink: 0 }}>
+          <i className="ti ti-file-spreadsheet" /> 下載範本
         </button>
       </div>
 
@@ -1071,6 +1091,12 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
         <div className="empty-state">
           <i className="ti ti-books" />
           <p>還沒有書喔！<br />點「新增書本」開始建立書單吧</p>
+        </div>
+      )}
+      {books.length > 0 && filteredBooks.length === 0 && (
+        <div className="empty-state">
+          <i className="ti ti-search-off" />
+          <p>找不到「{searchQuery}」<br />換個關鍵字試試看</p>
         </div>
       )}
 
