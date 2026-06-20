@@ -572,16 +572,50 @@ function Dashboard({ books, records, navigate }) {
       .slice(0, 3);
   }, [books, records]);
 
-  const booksWithMeta = useMemo(() => {
-    return books.map(b => {
-      const recs = records.filter(r => r.bookId === b.id).sort((a,z) => z.date.localeCompare(a.date));
-      return { ...b, recentDates: recs.slice(0,3).map(r => r.date), readCount: recs.length };
-    }).sort((a,z) => {
-      const la = a.recentDates[0] || '0';
-      const lz = z.recentDates[0] || '0';
-      return lz.localeCompare(la);
+  const [homeSortBy, setHomeSortBy] = useState('recent');
+  const [homeFilter, setHomeFilter] = useState('all');
+  const [openSeries, setOpenSeries] = useState({});
+
+  const lastReadMap = useMemo(() => {
+    const m = {};
+    records.forEach(r => { if (!m[r.bookId] || r.date > m[r.bookId]) m[r.bookId] = r.date; });
+    return m;
+  }, [records]);
+
+  const readCountMap = useMemo(() => {
+    const m = {};
+    records.forEach(r => { m[r.bookId] = (m[r.bookId] || 0) + 1; });
+    return m;
+  }, [records]);
+
+  const homeFiltered = useMemo(() => {
+    if (homeFilter === 'active') return books.filter(b => (b.status || 'active') === 'active');
+    if (homeFilter === 'wantToRead') return books.filter(b => b.status === 'wantToRead');
+    if (homeFilter === 'graduated') return books.filter(b => b.status === 'graduated');
+    return books;
+  }, [books, homeFilter]);
+
+  const sortedBooks = useMemo(() => {
+    const arr = [...homeFiltered];
+    if (homeSortBy === 'recent') arr.sort((a, b) => (lastReadMap[b.id] || '0').localeCompare(lastReadMap[a.id] || '0'));
+    else if (homeSortBy === 'newest') arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    else if (homeSortBy === 'az') arr.sort((a, b) => a.title.localeCompare(b.title, 'zh-TW'));
+    else if (homeSortBy === 'count') arr.sort((a, b) => (readCountMap[b.id] || 0) - (readCountMap[a.id] || 0));
+    return arr;
+  }, [homeFiltered, homeSortBy, lastReadMap, readCountMap]);
+
+  const { seriesMap, seriesList, standaloneBooks } = useMemo(() => {
+    const sm = {}; const sl = []; const sb = [];
+    sortedBooks.forEach(b => {
+      if (b.series) {
+        if (!sm[b.series]) { sm[b.series] = []; sl.push(b.series); }
+        sm[b.series].push(b);
+      } else { sb.push(b); }
     });
-  }, [books, records]);
+    return { seriesMap: sm, seriesList: [...new Set(sl)], standaloneBooks: sb };
+  }, [sortedBooks]);
+
+  const toggleSeries = (name) => setOpenSeries(prev => ({ ...prev, [name]: !prev[name] }));
 
   const monthlyData = useMemo(() => {
     const now = new Date();
@@ -688,45 +722,132 @@ function Dashboard({ books, records, navigate }) {
         </>
       )}
 
-      <div className="section">
-        <div className="section-title">最近共讀</div>
-      </div>
-
-      {booksWithMeta.length === 0 ? (
+      {books.length === 0 ? (
         <div className="no-books">
           <i className="ti ti-book-2" />
           還沒有書喔！點下方「+」開始記錄吧
         </div>
       ) : (
-        <div className="book-list">
-          {booksWithMeta.map(b => (
-            <div key={b.id} className="book-card" onClick={() => navigate('add', { bookId: b.id })}>
-              <div className="book-spine" style={{ background: getSpineColor(b.id) }} />
-              <div className="book-card-inner">
-                <div className="book-card-title">{b.title}</div>
-                {b.author && <div className="book-card-author">{b.author}{b.series ? ' · ' + b.series : ''}</div>}
-                <div className="book-card-meta">
-                  {b.rating > 0 && <Stars rating={b.rating} size={13} />}
-                  {b.recentDates.map(d => (
-                    <span key={d} className="date-chip">{fmtDate(d)}</span>
-                  ))}
+        <>
+          <div style={{ padding: '4px 16px 6px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-sub)', letterSpacing: '0.08em', textTransform: 'uppercase', marginRight: 2 }}>藏書</span>
+            {[['all','全部'],['active','進行中'],['wantToRead','待讀'],['graduated','已畢業']].map(([v,l]) => {
+              const cnt = v==='all' ? books.length : v==='active' ? books.filter(b=>(b.status||'active')==='active').length : books.filter(b=>b.status===v).length;
+              return cnt > 0 ? (
+                <button key={v} onClick={() => setHomeFilter(v)} style={{
+                  padding: '4px 10px', borderRadius: 20, border: '1.5px solid',
+                  borderColor: homeFilter===v ? 'var(--primary)' : 'var(--card-border)',
+                  background: homeFilter===v ? '#F5E8DA' : 'var(--bg)',
+                  color: homeFilter===v ? 'var(--primary-dark)' : 'var(--text-sub)',
+                  fontSize: 11, fontWeight: homeFilter===v ? 700 : 400,
+                  fontFamily: 'var(--font-round)', cursor: 'pointer', flexShrink: 0
+                }}>{l} ({cnt})</button>
+              ) : null;
+            })}
+            <select value={homeSortBy} onChange={e => setHomeSortBy(e.target.value)} style={{
+              marginLeft: 'auto', padding: '4px 22px 4px 8px', borderRadius: 10,
+              border: '0.5px solid var(--card-border)', background: 'var(--bg)',
+              color: 'var(--text-sub)', fontSize: 11, fontFamily: 'var(--font-round)',
+              cursor: 'pointer', outline: 'none', flexShrink: 0,
+              backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A7848' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
+              backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', backgroundSize: '13px', appearance: 'none'
+            }}>
+              <option value="recent">最近共讀</option>
+              <option value="newest">最新加入</option>
+              <option value="az">書名 A-Z</option>
+              <option value="count">共讀次數</option>
+            </select>
+          </div>
+
+          {seriesList.map((series, idx) => {
+            const theme = SERIES_THEMES[idx % SERIES_THEMES.length];
+            const booksInSeries = seriesMap[series];
+            const isOpen = openSeries[series] !== false;
+            return (
+              <div key={series} className="series-block">
+                <div className="series-header"
+                  style={{ background: theme.bg, borderRadius: isOpen ? '10px 10px 0 0' : '10px', border: '0.5px solid ' + theme.border, borderBottom: isOpen ? 'none' : '0.5px solid ' + theme.border }}
+                  onClick={() => toggleSeries(series)}>
+                  <div className="series-header-left">
+                    <div className="series-dot" style={{ background: theme.dot }} />
+                    <span className="series-name" style={{ color: theme.text }}>{series}</span>
+                    <span className="series-count" style={{ color: theme.text }}>{booksInSeries.length} 本</span>
+                  </div>
+                  <i className={'ti ti-chevron-down series-chevron' + (isOpen ? ' open' : '')} style={{ color: theme.dot }} />
                 </div>
-              </div>
-              <div className="book-card-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                {b.readCount > 0 && (
-                  <div className="book-count-badge">
-                    <i className="ti ti-headphones" style={{ fontSize: 13 }} />
-                    {b.readCount}
+                {isOpen && (
+                  <div className="series-books" style={{ borderColor: theme.border }}>
+                    {booksInSeries.map(b => {
+                      const rc = readCountMap[b.id] || 0; const ld = lastReadMap[b.id];
+                      return (
+                        <div key={b.id} className="lib-book-row" onClick={() => navigate('add', { bookId: b.id })}>
+                          <div className="lib-spine" style={{ background: getSpineColor(b.id) }} />
+                          <div className="lib-book-info">
+                            <div className="lib-book-title">
+                              {b.title}
+                              {b.status === 'graduated' && <span style={{ fontSize: 11, marginLeft: 5, verticalAlign: 'middle' }}>🎓</span>}
+                              {b.status === 'wantToRead' && <span style={{ fontSize: 10, marginLeft: 5, padding: '1px 5px', borderRadius: 6, background: '#E4F0E8', color: '#3A8050', fontWeight: 600, verticalAlign: 'middle' }}>待讀</span>}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                              {b.author && <span className="lib-book-author">{b.author}</span>}
+                              {ld && <span className="date-chip">{fmtDate(ld)}</span>}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                            {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?starColor(b.rating):'#DDD0C0'}}/>)}</div>}
+                            {rc > 0 && <span style={{fontSize:11,color:'var(--text-light)'}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
+                            <button onClick={e=>{e.stopPropagation();navigate('add',{bookId:b.id});}} style={{fontSize:11,padding:'2px 7px',borderRadius:8,border:'1px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)'}}>+ 記錄</button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); navigate('add', { bookId: b.id }); }}
-                  style={{ fontSize: 11, padding: '3px 8px', borderRadius: 8, border: '1px solid var(--primary)', background: '#F5E8DA', color: 'var(--primary-dark)', cursor: 'pointer', fontFamily: 'var(--font-round)', whiteSpace: 'nowrap' }}
-                >+ 記錄</button>
               </div>
+            );
+          })}
+
+          {standaloneBooks.length > 0 && (
+            <>
+              {seriesList.length > 0 && <div className="standalone-header">單本書</div>}
+              <div style={{ margin: '0 16px 16px' }}>
+                <div className="series-books" style={{ borderRadius: 10, border: '0.5px solid var(--card-border)' }}>
+                  {standaloneBooks.map(b => {
+                    const rc = readCountMap[b.id] || 0; const ld = lastReadMap[b.id];
+                    return (
+                      <div key={b.id} className="lib-book-row" onClick={() => navigate('add', { bookId: b.id })}>
+                        <div className="lib-spine" style={{ background: getSpineColor(b.id) }} />
+                        <div className="lib-book-info">
+                          <div className="lib-book-title">
+                            {b.title}
+                            {b.status === 'graduated' && <span style={{ fontSize: 11, marginLeft: 5, verticalAlign: 'middle' }}>🎓</span>}
+                            {b.status === 'wantToRead' && <span style={{ fontSize: 10, marginLeft: 5, padding: '1px 5px', borderRadius: 6, background: '#E4F0E8', color: '#3A8050', fontWeight: 600, verticalAlign: 'middle' }}>待讀</span>}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                            {b.author && <span className="lib-book-author">{b.author}</span>}
+                            {ld && <span className="date-chip">{fmtDate(ld)}</span>}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                          {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?starColor(b.rating):'#DDD0C0'}}/>)}</div>}
+                          {rc > 0 && <span style={{fontSize:11,color:'var(--text-light)'}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
+                          <button onClick={e=>{e.stopPropagation();navigate('add',{bookId:b.id});}} style={{fontSize:11,padding:'2px 7px',borderRadius:8,border:'1px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)'}}>+ 記錄</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {sortedBooks.length === 0 && (
+            <div className="empty-state">
+              <i className="ti ti-filter-off" />
+              <p>這個分類目前沒有書</p>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );
