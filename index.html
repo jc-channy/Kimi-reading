@@ -389,7 +389,7 @@
     .d-stat-label i { font-size: 14px; color: var(--primary); }
     .d-stat-val { font-size: 15px; font-weight: 700; color: var(--text); }
     .d-add-btn {
-      margin: 0 12px; background: var(--primary-btn); color: #fff;
+      margin: 0 12px 12px; background: var(--primary-btn); color: #fff;
       border: none; border-radius: 10px; padding: 11px;
       font-size: 14px; font-weight: 700; font-family: var(--font-round);
       cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -554,7 +554,7 @@ function Toast({ msg }) {
 /* ═══════════════════════════════════════
    Dashboard (merged with BookLibrary)
 ═══════════════════════════════════════ */
-function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, importData, toast }) {
+function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, importData, toast, addBookTrigger, hideAddBtn }) {
   // ── Stats ──
   const totalDays = useMemo(() => new Set(records.map(r => r.date)).size, [records]);
 
@@ -705,6 +705,10 @@ function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, 
     setNewNotes(''); setNewRating(0); setBookStatus('active');
     setEditBook(null); setEditBookId(null);
   };
+
+  useEffect(() => {
+    if (addBookTrigger > 0) { resetForm(); setShowAddForm(true); setTimeout(() => { const el = document.querySelector('.add-book-form-card'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 100); }
+  }, [addBookTrigger]);
 
   const openEditBook = (b) => {
     if (editBookId === b.id) { resetForm(); return; }
@@ -889,56 +893,6 @@ function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, 
         </div>
       </div>
 
-      {/* Top 3 */}
-      {top3.length > 0 && (
-        <>
-          <div className="section"><div className="section-title">共讀 Top 3</div></div>
-          <div style={{ padding:'0 16px 4px', display:'flex', flexDirection:'column', gap:8 }}>
-            {top3.map((b, idx) => (
-              <div key={b.id} onClick={() => navigate('add', { bookId: b.id })}
-                style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px',
-                  background:'var(--card)', border:'0.5px solid var(--card-border)', borderRadius:12, cursor:'pointer' }}>
-                <span style={{ fontSize:18, fontWeight:800, color:idx===0?'#E8A840':idx===1?'#A0A0A0':'#C87840', width:24, textAlign:'center', flexShrink:0 }}>{idx+1}</span>
-                <div className="book-spine" style={{ background:getSpineColor(b.id), width:5, borderRadius:2, alignSelf:'stretch' }} />
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:14, fontWeight:700, color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{b.title}</div>
-                  {b.author && <div style={{ fontSize:12, color:'var(--text-light)' }}>{b.author}</div>}
-                </div>
-                <div className="book-count-badge"><i className="ti ti-headphones" style={{ fontSize:12 }} /> {b.readCount}</div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Monthly chart */}
-      {monthlyData.some(m => m.count > 0) && (
-        <>
-          <div className="section"><div className="section-title">每月共讀次數</div></div>
-          <div style={{ padding:'0 16px 12px' }}>
-            <div style={{ background:'var(--card)', border:'0.5px solid var(--card-border)', borderRadius:'var(--radius)', padding:'14px 12px 10px' }}>
-              {(() => {
-                const maxC = Math.max(...monthlyData.map(m => m.count), 1);
-                const BAR_H = 60;
-                return (
-                  <div style={{ display:'flex', alignItems:'flex-end', gap:2 }}>
-                    {monthlyData.map(m => {
-                      const h = m.count > 0 ? Math.max(4, Math.round(m.count / maxC * BAR_H)) : 2;
-                      return (
-                        <div key={m.prefix} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
-                          {m.count > 0 && <div style={{ fontSize:8, color:m.isCurrent?'var(--primary-dark)':'var(--text-sub)', fontWeight:700, marginBottom:2 }}>{m.count}</div>}
-                          <div style={{ width:'100%', height:h, borderRadius:'2px 2px 0 0', background:m.isCurrent?'var(--primary)':'#D4B896', opacity:m.count===0?0.3:1 }} />
-                          <div style={{ fontSize:8, color:m.isCurrent?'var(--primary-dark)':'var(--text-light)', marginTop:4, textAlign:'center', lineHeight:1.2, fontWeight:m.isCurrent?700:400 }}>{m.label}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        </>
-      )}
 
       {/* Book section header */}
       <div style={{ padding:'4px 16px 6px', display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
@@ -1053,6 +1007,11 @@ function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, 
       )}
 
       {/* Add book */}
+      {!hideAddBtn && !showAddForm && (
+        <button className="add-book-btn" onClick={() => { resetForm(); setShowAddForm(true); }}>
+          <i className="ti ti-plus" /> 新增書本
+        </button>
+      )}
       {showAddForm ? (
         <div className="card add-book-form-card" style={{ marginTop:8 }}>
           <div className="card-title"><i className="ti ti-book-plus" />新增書本</div>
@@ -1078,10 +1037,6 @@ function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, 
             <button className="btn-secondary" onClick={() => { setShowAddForm(false); resetForm(); }}>取消</button>
           </div>
         </div>
-      ) : (
-        <button className="add-book-btn" onClick={() => { resetForm(); setShowAddForm(true); }}>
-          <i className="ti ti-plus" /> 新增書本
-        </button>
       )}
 
       <div style={{ textAlign:'center', padding:'4px 16px 16px' }}>
@@ -1818,6 +1773,8 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
     return records.filter(r => r.date && r.date.startsWith(prefix)).length;
   }, [records]);
 
+  const [addBookTrigger, setAddBookTrigger] = useState(0);
+
   const panelNavigate = useCallback(() => closePanel(), [closePanel]);
   const desktopNavigate = useCallback((p, params) => {
     if (p === 'add') { openPanel(params?.bookId || ''); }
@@ -1865,6 +1822,9 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
         <button className="d-add-btn" onClick={() => openPanel('')}>
           <i className="ti ti-plus" /> 記錄今天
         </button>
+        <button className="d-add-btn" style={{ marginTop:8, background:'var(--bg)', color:'var(--primary-dark)', border:'1.5px solid var(--primary)', boxShadow:'none' }} onClick={() => setAddBookTrigger(n => n + 1)}>
+          <i className="ti ti-book-plus" /> 新增書本
+        </button>
       </aside>
 
       {/* Main content */}
@@ -1873,6 +1833,7 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
           books={books} records={records} navigate={desktopNavigate}
           addBook={addBook} deleteBook={deleteBook}
           exportData={exportData} importData={importData} toast={toast}
+          addBookTrigger={addBookTrigger} hideAddBtn={true}
         />
       </main>
 
