@@ -322,7 +322,7 @@
     border: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 4px 20px rgba(168,104,56,0.40);
-    z-index: 100;
+    z-index: 40;
     transition: transform 0.15s;
   }
   .fab-fixed:active { transform: scale(0.93); }
@@ -1805,18 +1805,11 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
     return records.filter(r => r.date && r.date.startsWith(prefix)).length;
   }, [records]);
 
-  const booksWithMeta = useMemo(() => {
-    return books.map(b => {
-      const recs = records.filter(r => r.bookId === b.id).sort((a,z) => z.date.localeCompare(a.date));
-      return { ...b, recentDates: recs.slice(0,2).map(r => r.date), readCount: recs.length };
-    }).sort((a,z) => {
-      const la = a.recentDates[0] || '0';
-      const lz = z.recentDates[0] || '0';
-      return lz.localeCompare(la);
-    });
-  }, [books, records]);
-
   const panelNavigate = useCallback(() => closePanel(), [closePanel]);
+  const desktopNavigate = useCallback((p, params) => {
+    if (p === 'add') { openPanel(params?.bookId || ''); }
+    else { navigate(p); }
+  }, [navigate, openPanel]);
 
   return (
     <div className="d-layout">
@@ -1863,50 +1856,11 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
 
       {/* Main content */}
       <main className="d-main">
-        {page === 'home' && (
-          <>
-            <div className="d-topbar">
-              <div className="d-topbar-title">最近共讀的書</div>
-              <div className="d-topbar-sub">按最近閱讀排序</div>
-            </div>
-            <div className="d-content">
-              {books.length === 0 ? (
-                <div className="empty-state">
-                  <i className="ti ti-book-2" />
-                  <p>還沒有書喔！點左側「記錄今天」開始新增吧</p>
-                </div>
-              ) : (
-                <>
-                  <div className="d-section-title">書單</div>
-                  <div className="d-book-grid">
-                    {booksWithMeta.map(b => (
-                      <div key={b.id} className="d-book-card" onClick={() => openPanel(b.id)}>
-                        <div className="d-spine" style={{ background: getSpineColor(b.id) }} />
-                        <div className="d-book-inner">
-                          <div className="d-book-title">{b.title}</div>
-                          {(b.author || b.series) && (
-                            <div className="d-book-author">{b.author}{b.series ? ' · ' + b.series : ''}</div>
-                          )}
-                          <div className="d-book-footer">
-                            {b.rating > 0 && <Stars rating={b.rating} size={11} />}
-                            {b.recentDates.map(d => (
-                              <span key={d} className="date-chip">{fmtDate(d)}</span>
-                            ))}
-                            {b.readCount > 0 && (
-                              <span className="d-read-count">
-                                <i className="ti ti-headphones" style={{ fontSize: 11 }} /> {b.readCount}次
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </>
-        )}
+        <Dashboard
+          books={books} records={records} navigate={desktopNavigate}
+          addBook={addBook} deleteBook={deleteBook}
+          exportData={exportData} importData={importData} toast={toast}
+        />
       </main>
 
       {/* Slide panel */}
