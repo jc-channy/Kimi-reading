@@ -39,7 +39,7 @@
 
   /* ── Layout ── */
   .app { display: flex; flex-direction: column; min-height: 100vh; }
-  .page { flex: 1; padding: 0 0 calc(var(--nav-h) + 16px); overflow-y: auto; }
+  .page { flex: 1; padding: 0 0 96px; overflow-y: auto; }
 
   /* ── Hero ── */
   .hero {
@@ -315,8 +315,21 @@
   .add-book-btn:active { background: #F5EDE0; border-color: var(--primary); color: var(--primary-dark); }
 
   /* Toast */
+  .fab-fixed {
+    position: fixed; bottom: 20px; right: 20px;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--primary-btn);
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(168,104,56,0.40);
+    z-index: 100;
+    transition: transform 0.15s;
+  }
+  .fab-fixed:active { transform: scale(0.93); }
+  .fab-fixed i { font-size: 26px; color: #fff; }
+
   .toast {
-    position: fixed; bottom: calc(var(--nav-h) + 16px); left: 50%; transform: translateX(-50%);
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
     background: var(--text); color: #fff;
     padding: 10px 22px; border-radius: 24px;
     font-size: 13px; font-weight: 600;
@@ -539,9 +552,10 @@ function Toast({ msg }) {
 }
 
 /* ═══════════════════════════════════════
-   Dashboard
+   Dashboard (merged with BookLibrary)
 ═══════════════════════════════════════ */
-function Dashboard({ books, records, navigate }) {
+function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, importData, toast }) {
+  // ── Stats ──
   const totalDays = useMemo(() => new Set(records.map(r => r.date)).size, [records]);
 
   const streak = useMemo(() => {
@@ -572,10 +586,149 @@ function Dashboard({ books, records, navigate }) {
       .slice(0, 3);
   }, [books, records]);
 
-  const [homeSortBy, setHomeSortBy] = useState('recent');
-  const [homeFilter, setHomeFilter] = useState('all');
+  // ── Filter / Sort ──
+  const [filterTab, setFilterTab] = useState('all');
+  const [sortBy, setSortBy] = useState('recent');
   const [openSeries, setOpenSeries] = useState({});
 
+  // ── Book edit state ──
+  const [editBookId, setEditBookId] = useState(null);
+  const [editBook, setEditBook] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newAuthor, setNewAuthor] = useState('');
+  const [newSeries, setNewSeries] = useState('');
+  const [newNotes, setNewNotes] = useState('');
+  const [newRating, setNewRating] = useState(0);
+  const [bookStatus, setBookStatus] = useState('active');
+  const [importMode, setImportMode] = useState(null);
+  const [pendingImport, setPendingImport] = useState(null);
+  const fileInputRef = React.useRef(null);
+
+  const ROW_COL_MAP = {
+    '書名': 'title', 'title': 'title',
+    '作者': 'author', 'author': 'author',
+    '系列': 'series', 'series': 'series',
+    '書本備註': 'notes', '備註': 'notes', 'notes': 'notes',
+    '星星': 'rating', 'rating': 'rating',
+    '狀態': 'status', '已畢業': 'status', 'graduated': 'status', 'status': 'status',
+    '日期': 'date', 'date': 'date',
+    '時間': 'duration', 'duration': 'duration',
+    '反應': 'leloReaction', 'reaction': 'leloReaction',
+    '跟著唸': 'leloFollowed', 'followed': 'leloFollowed',
+    '學到的句子': 'leloSentences', 'sentences': 'leloSentences',
+    '媽媽觀察': 'momNotes', 'momnotes': 'momNotes',
+  };
+
+  const parseSheet = (sheet, colMap) => {
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    return rows.map(row => {
+      const obj = {};
+      Object.entries(row).forEach(([k, v]) => {
+        const mapped = colMap[k] || colMap[k.toLowerCase().trim()];
+        if (mapped) obj[mapped] = v;
+      });
+      return obj;
+    }).filter(obj => Object.keys(obj).length > 0);
+  };
+
+  const processRows = (rows) => {
+    if (rows.length === 0) { toast('找不到資料，請確認欄位名稱'); return; }
+    const bookByTitle = {};
+    rows.forEach(r => {
+      if (!bookByTitle[r.title]) {
+        const rawSt = r.status;
+        const bookSt = rawSt === '已畢業' || rawSt === true || rawSt === '是' ? 'graduated'
+          : rawSt === '待讀' ? 'wantToRead' : 'active';
+        bookByTitle[r.title] = {
+          id: genId(), title: r.title, author: r.author||'', series: r.series||'',
+          notes: r.notes||'', rating: parseInt(r.rating)||0,
+          status: bookSt, createdAt: today()
+        };
+      } else if (r.rating) {
+        bookByTitle[r.title].rating = parseInt(r.rating) || bookByTitle[r.title].rating;
+      }
+    });
+    const parsedBooks = Object.values(bookByTitle);
+    const parsedRecs = [];
+    rows.filter(r => r.date).forEach(r => {
+      const dates = String(r.date).split(',').map(d => d.trim()).filter(Boolean).sort();
+      const latestDate = dates[dates.length - 1];
+      dates.forEach(d => {
+        const isLatest = d === latestDate;
+        parsedRecs.push({
+          id: genId(), bookId: bookByTitle[r.title]?.id || '', bookTitle: r.title,
+          date: d, duration: isLatest ? (r.duration || '20分鐘') : '',
+          leloReaction: isLatest ? (r.leloReaction || '') : '',
+          leloFollowed: isLatest ? (r.leloFollowed === true || r.leloFollowed === '是') : false,
+          leloSentences: isLatest ? (r.leloSentences || '') : '',
+          momNotes: isLatest ? (r.momNotes || '') : '', createdAt: today()
+        });
+      });
+    });
+    setPendingImport({ books: parsedBooks, records: parsedRecs });
+    setImportMode('confirm');
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    const isCsv = file.name.toLowerCase().endsWith('.csv');
+    reader.onload = (ev) => {
+      try {
+        let wb;
+        if (isCsv) { wb = XLSX.read(ev.target.result, { type: 'string' }); }
+        else { wb = XLSX.read(ev.target.result, { type: 'array' }); }
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        processRows(parseSheet(sheet, ROW_COL_MAP).filter(r => r.title));
+      } catch (err) { toast('讀取失敗：' + err.message); }
+    };
+    if (isCsv) { reader.readAsText(file, 'UTF-8'); } else { reader.readAsArrayBuffer(file); }
+    e.target.value = '';
+  };
+
+  const downloadTemplate = () => {
+    const wb = XLSX.utils.book_new();
+    const data = [
+      HEADERS,
+      ['I Love My White Shoes', 'James Dean', 'Pete the Cat', '重複句型', 5, '', '2026-06-10', '20分鐘', 'love', '是', 'no matter what', ''],
+      ['Brown Bear, Brown Bear', 'Bill Martin Jr.', '', '重複句型好學', 4, '', '2026-06-12', '15分鐘', 'like', '是', 'What do you see?', ''],
+      ['The Very Hungry Caterpillar', 'Eric Carle', '', '', 3, '是', '', '', '', '', '', ''],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), '共讀紀錄');
+    XLSX.writeFile(wb, 'lele-reading-template.xlsx');
+  };
+
+  const resetForm = () => {
+    setNewTitle(''); setNewAuthor(''); setNewSeries('');
+    setNewNotes(''); setNewRating(0); setBookStatus('active');
+    setEditBook(null); setEditBookId(null);
+  };
+
+  const openEditBook = (b) => {
+    if (editBookId === b.id) { resetForm(); return; }
+    setShowAddForm(false);
+    setEditBook(b);
+    setNewTitle(b.title); setNewAuthor(b.author || '');
+    setNewSeries(b.series || ''); setNewNotes(b.notes || '');
+    setNewRating(b.rating || 0); setBookStatus(b.status || 'active');
+    setEditBookId(b.id);
+  };
+
+  const handleSubmit = useCallback(() => {
+    if (!newTitle.trim()) { toast('請輸入書名'); return; }
+    if (editBook) {
+      addBook({ ...editBook, title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), notes: newNotes.trim(), rating: newRating, status: bookStatus }, true);
+      toast('書本已更新！');
+    } else {
+      addBook({ id: genId(), title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), notes: newNotes.trim(), rating: 0, status: 'active', createdAt: today() });
+      toast('書本已新增！');
+    }
+    resetForm(); setShowAddForm(false);
+  }, [newTitle, newAuthor, newSeries, newNotes, newRating, bookStatus, editBook, addBook, toast]);
+
+  // ── Computed ──
   const lastReadMap = useMemo(() => {
     const m = {};
     records.forEach(r => { if (!m[r.bookId] || r.date > m[r.bookId]) m[r.bookId] = r.date; });
@@ -588,21 +741,21 @@ function Dashboard({ books, records, navigate }) {
     return m;
   }, [records]);
 
-  const homeFiltered = useMemo(() => {
-    if (homeFilter === 'active') return books.filter(b => (b.status || 'active') === 'active');
-    if (homeFilter === 'wantToRead') return books.filter(b => b.status === 'wantToRead');
-    if (homeFilter === 'graduated') return books.filter(b => b.status === 'graduated');
+  const tabFiltered = useMemo(() => {
+    if (filterTab === 'active') return books.filter(b => (b.status || 'active') === 'active');
+    if (filterTab === 'wantToRead') return books.filter(b => b.status === 'wantToRead');
+    if (filterTab === 'graduated') return books.filter(b => b.status === 'graduated');
     return books;
-  }, [books, homeFilter]);
+  }, [books, filterTab]);
 
   const sortedBooks = useMemo(() => {
-    const arr = [...homeFiltered];
-    if (homeSortBy === 'recent') arr.sort((a, b) => (lastReadMap[b.id] || '0').localeCompare(lastReadMap[a.id] || '0'));
-    else if (homeSortBy === 'newest') arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-    else if (homeSortBy === 'az') arr.sort((a, b) => a.title.localeCompare(b.title, 'zh-TW'));
-    else if (homeSortBy === 'count') arr.sort((a, b) => (readCountMap[b.id] || 0) - (readCountMap[a.id] || 0));
+    const arr = [...tabFiltered];
+    if (sortBy === 'recent') arr.sort((a, b) => (lastReadMap[b.id] || '0').localeCompare(lastReadMap[a.id] || '0'));
+    else if (sortBy === 'newest') arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    else if (sortBy === 'az') arr.sort((a, b) => a.title.localeCompare(b.title, 'zh-TW'));
+    else if (sortBy === 'count') arr.sort((a, b) => (readCountMap[b.id] || 0) - (readCountMap[a.id] || 0));
     return arr;
-  }, [homeFiltered, homeSortBy, lastReadMap, readCountMap]);
+  }, [tabFiltered, sortBy, lastReadMap, readCountMap]);
 
   const { seriesMap, seriesList, standaloneBooks } = useMemo(() => {
     const sm = {}; const sl = []; const sb = [];
@@ -630,87 +783,139 @@ function Dashboard({ books, records, navigate }) {
     return months;
   }, [records]);
 
+  const allSeriesList = useMemo(() => [...new Set(books.filter(b => b.series).map(b => b.series))], [books]);
+
+  // ── Book row with inline edit ──
+  const InlineEditForm = ({ b }) => (
+    <div style={{ background: '#FDF5EC', borderTop: '0.5px solid var(--card-border)', padding: 14 }}>
+      <div style={{ marginBottom: 10 }}>
+        <label className="form-label">書名 *</label>
+        <input className="form-input" value={newTitle} onChange={e => setNewTitle(e.target.value)} style={{ fontSize: 13, padding: '7px 10px' }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+        <div>
+          <label className="form-label">作者</label>
+          <input className="form-input" value={newAuthor} onChange={e => setNewAuthor(e.target.value)} style={{ fontSize: 13, padding: '7px 10px' }} />
+        </div>
+        <div>
+          <label className="form-label">系列</label>
+          <input className="form-input" value={newSeries} onChange={e => setNewSeries(e.target.value)} list="edit-series-list" style={{ fontSize: 13, padding: '7px 10px' }} />
+          <datalist id="edit-series-list">{allSeriesList.map(s => <option key={s} value={s} />)}</datalist>
+        </div>
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <label className="form-label">備註</label>
+        <input className="form-input" value={newNotes} onChange={e => setNewNotes(e.target.value)} style={{ fontSize: 13, padding: '7px 10px' }} />
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <label className="form-label">喜愛度</label>
+        <StarRating value={newRating} onChange={setNewRating} />
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <label className="form-label">狀態</label>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[['active','📖 進行中'],['wantToRead','📚 待讀'],['graduated','🎓 已畢業']].map(([v,l]) => (
+            <button key={v} className={'chip' + (bookStatus===v?' sel':'')} onClick={() => setBookStatus(v)} style={{ flex:1, textAlign:'center', fontSize:11, padding:'5px 4px' }}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn-primary" style={{ flex:1, padding:10 }} onClick={handleSubmit}>
+          <i className="ti ti-check" /> 儲存
+        </button>
+        <button className="btn-secondary" style={{ padding:'10px 14px', fontSize:13 }} onClick={resetForm}>取消</button>
+        <button
+          onClick={() => { if (window.confirm('確定刪除「' + b.title + '」？\n相關的共讀紀錄也會一併刪除。')) { deleteBook(b.id); resetForm(); toast('已刪除'); } }}
+          style={{ padding:'10px 12px', borderRadius:10, border:'1.5px solid #E8A0A0', background:'none', color:'#C04040', fontSize:13, fontFamily:'var(--font-round)', cursor:'pointer' }}
+        ><i className="ti ti-trash" /></button>
+      </div>
+    </div>
+  );
+
+  const BookRow = ({ b }) => {
+    const rc = readCountMap[b.id] || 0;
+    const ld = lastReadMap[b.id];
+    const isEditing = editBookId === b.id;
+    return (
+      <>
+        <div className="lib-book-row" onClick={() => openEditBook(b)} style={{ background: isEditing ? '#FFF8F0' : undefined }}>
+          <div className="lib-spine" style={{ background: getSpineColor(b.id) }} />
+          <div className="lib-book-info">
+            <div className="lib-book-title">
+              {b.title}
+              {b.status === 'graduated' && <span style={{ fontSize:11, marginLeft:5, verticalAlign:'middle' }}>🎓</span>}
+              {b.status === 'wantToRead' && <span style={{ fontSize:10, marginLeft:5, padding:'1px 5px', borderRadius:6, background:'#E4F0E8', color:'#3A8050', fontWeight:600, verticalAlign:'middle' }}>待讀</span>}
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:2 }}>
+              {b.author && <span className="lib-book-author">{b.author}</span>}
+              {ld && <span className="date-chip">{fmtDate(ld)}</span>}
+            </div>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
+            {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?starColor(b.rating):'#DDD0C0'}}/>)}</div>}
+            {rc > 0 && <span style={{fontSize:11,color:'var(--text-light)'}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
+            <button onClick={e=>{e.stopPropagation();navigate('add',{bookId:b.id});}} style={{fontSize:11,padding:'2px 7px',borderRadius:8,border:'1px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)'}}>＋ 記錄</button>
+          </div>
+        </div>
+        {isEditing && <InlineEditForm b={b} />}
+      </>
+    );
+  };
+
   return (
-    <div className="page" style={{ paddingBottom: 'calc(var(--nav-h) + 16px)' }}>
+    <div className="page">
+      {/* Hero */}
       <div className="hero">
         <div className="hero-title">📖 樂樂的英文共讀</div>
         <div className="hero-sub">每一天的聆聽，都是成長的足跡</div>
         <div className="hero-stats">
-          <div className="stat-pill">
-            <i className="ti ti-calendar-heart" />
-            {totalDays}<span>共讀天數</span>
-          </div>
-          <div className="stat-pill">
-            <i className="ti ti-books" />
-            {books.length}<span>本書</span>
-          </div>
-          {streak > 0 && (
-            <div className="stat-pill">
-              <i className="ti ti-flame" style={{ color: '#E87840' }} />
-              {streak}<span>連續天</span>
-            </div>
-          )}
-          <div className="stat-pill">
-            <i className="ti ti-calendar-month" />
-            {thisMonth}<span>本月</span>
-          </div>
+          <div className="stat-pill"><i className="ti ti-calendar-heart" />{totalDays}<span>共讀天數</span></div>
+          <div className="stat-pill"><i className="ti ti-books" />{books.length}<span>本書</span></div>
+          {streak > 0 && <div className="stat-pill"><i className="ti ti-flame" style={{ color:'#E87840' }} />{streak}<span>連續天</span></div>}
+          <div className="stat-pill"><i className="ti ti-calendar-month" />{thisMonth}<span>本月</span></div>
         </div>
-        <button className="hero-cta" onClick={() => navigate('add')}>
-          <i className="ti ti-plus" /> 記錄今天的共讀
-        </button>
       </div>
 
+      {/* Top 3 */}
       {top3.length > 0 && (
         <>
-          <div className="section">
-            <div className="section-title">共讀 Top 3</div>
-          </div>
-          <div style={{ padding: '0 16px 4px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="section"><div className="section-title">共讀 Top 3</div></div>
+          <div style={{ padding:'0 16px 4px', display:'flex', flexDirection:'column', gap:8 }}>
             {top3.map((b, idx) => (
               <div key={b.id} onClick={() => navigate('add', { bookId: b.id })}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-                  background: 'var(--card)', border: '0.5px solid var(--card-border)',
-                  borderRadius: 12, cursor: 'pointer' }}>
-                <span style={{ fontSize: 18, fontWeight: 800, color: idx === 0 ? '#E8A840' : idx === 1 ? '#A0A0A0' : '#C87840', width: 24, textAlign: 'center', flexShrink: 0 }}>
-                  {idx + 1}
-                </span>
-                <div className="book-spine" style={{ background: getSpineColor(b.id), width: 5, borderRadius: 2, alignSelf: 'stretch' }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}</div>
-                  {b.author && <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{b.author}</div>}
+                style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px',
+                  background:'var(--card)', border:'0.5px solid var(--card-border)', borderRadius:12, cursor:'pointer' }}>
+                <span style={{ fontSize:18, fontWeight:800, color:idx===0?'#E8A840':idx===1?'#A0A0A0':'#C87840', width:24, textAlign:'center', flexShrink:0 }}>{idx+1}</span>
+                <div className="book-spine" style={{ background:getSpineColor(b.id), width:5, borderRadius:2, alignSelf:'stretch' }} />
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{b.title}</div>
+                  {b.author && <div style={{ fontSize:12, color:'var(--text-light)' }}>{b.author}</div>}
                 </div>
-                <div className="book-count-badge">
-                  <i className="ti ti-headphones" style={{ fontSize: 12 }} /> {b.readCount}
-                </div>
+                <div className="book-count-badge"><i className="ti ti-headphones" style={{ fontSize:12 }} /> {b.readCount}</div>
               </div>
             ))}
           </div>
         </>
       )}
 
+      {/* Monthly chart */}
       {monthlyData.some(m => m.count > 0) && (
         <>
-          <div className="section">
-            <div className="section-title">每月共讀次數</div>
-          </div>
-          <div style={{ padding: '0 16px 12px' }}>
-            <div style={{ background: 'var(--card)', border: '0.5px solid var(--card-border)', borderRadius: 'var(--radius)', padding: '14px 12px 10px' }}>
+          <div className="section"><div className="section-title">每月共讀次數</div></div>
+          <div style={{ padding:'0 16px 12px' }}>
+            <div style={{ background:'var(--card)', border:'0.5px solid var(--card-border)', borderRadius:'var(--radius)', padding:'14px 12px 10px' }}>
               {(() => {
                 const maxC = Math.max(...monthlyData.map(m => m.count), 1);
                 const BAR_H = 60;
                 return (
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
+                  <div style={{ display:'flex', alignItems:'flex-end', gap:2 }}>
                     {monthlyData.map(m => {
                       const h = m.count > 0 ? Math.max(4, Math.round(m.count / maxC * BAR_H)) : 2;
                       return (
-                        <div key={m.prefix} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          {m.count > 0 && (
-                            <div style={{ fontSize: 8, color: m.isCurrent ? 'var(--primary-dark)' : 'var(--text-sub)', fontWeight: 700, marginBottom: 2 }}>{m.count}</div>
-                          )}
-                          <div style={{ width: '100%', height: h, borderRadius: '2px 2px 0 0',
-                            background: m.isCurrent ? 'var(--primary)' : '#D4B896',
-                            opacity: m.count === 0 ? 0.3 : 1 }} />
-                          <div style={{ fontSize: 8, color: m.isCurrent ? 'var(--primary-dark)' : 'var(--text-light)', marginTop: 4, textAlign: 'center', lineHeight: 1.2, fontWeight: m.isCurrent ? 700 : 400 }}>{m.label}</div>
+                        <div key={m.prefix} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
+                          {m.count > 0 && <div style={{ fontSize:8, color:m.isCurrent?'var(--primary-dark)':'var(--text-sub)', fontWeight:700, marginBottom:2 }}>{m.count}</div>}
+                          <div style={{ width:'100%', height:h, borderRadius:'2px 2px 0 0', background:m.isCurrent?'var(--primary)':'#D4B896', opacity:m.count===0?0.3:1 }} />
+                          <div style={{ fontSize:8, color:m.isCurrent?'var(--primary-dark)':'var(--text-light)', marginTop:4, textAlign:'center', lineHeight:1.2, fontWeight:m.isCurrent?700:400 }}>{m.label}</div>
                         </div>
                       );
                     })}
@@ -722,43 +927,76 @@ function Dashboard({ books, records, navigate }) {
         </>
       )}
 
+      {/* Book section header */}
+      <div style={{ padding:'4px 16px 6px', display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+        <span style={{ fontSize:12, fontWeight:700, color:'var(--text-sub)', letterSpacing:'0.08em', textTransform:'uppercase', marginRight:2 }}>藏書</span>
+        {[['all','全部'],['active','進行中'],['wantToRead','待讀'],['graduated','已畢業']].map(([v,l]) => {
+          const cnt = v==='all' ? books.length : v==='active' ? books.filter(b=>(b.status||'active')==='active').length : books.filter(b=>b.status===v).length;
+          return cnt > 0 ? (
+            <button key={v} onClick={() => setFilterTab(v)} style={{
+              padding:'4px 10px', borderRadius:20, border:'1.5px solid',
+              borderColor:filterTab===v?'var(--primary)':'var(--card-border)',
+              background:filterTab===v?'#F5E8DA':'var(--bg)',
+              color:filterTab===v?'var(--primary-dark)':'var(--text-sub)',
+              fontSize:11, fontWeight:filterTab===v?700:400,
+              fontFamily:'var(--font-round)', cursor:'pointer', flexShrink:0
+            }}>{l} ({cnt})</button>
+          ) : null;
+        })}
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{
+          marginLeft:'auto', padding:'4px 22px 4px 8px', borderRadius:10,
+          border:'0.5px solid var(--card-border)', background:'var(--bg)',
+          color:'var(--text-sub)', fontSize:11, fontFamily:'var(--font-round)',
+          cursor:'pointer', outline:'none', flexShrink:0,
+          backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A7848' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
+          backgroundRepeat:'no-repeat', backgroundPosition:'right 4px center', backgroundSize:'13px', appearance:'none'
+        }}>
+          <option value="recent">最近共讀</option>
+          <option value="newest">最新加入</option>
+          <option value="az">書名 A-Z</option>
+          <option value="count">共讀次數</option>
+        </select>
+        <button onClick={exportData} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 9px', borderRadius:16, border:'0.5px solid var(--card-border)', background:'var(--bg)', color:'var(--text-light)', fontSize:11, fontFamily:'var(--font-round)', cursor:'pointer' }}>
+          <i className="ti ti-download" style={{ fontSize:12 }} /> 匯出
+        </button>
+        <button onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 9px', borderRadius:16, border:'0.5px solid var(--primary)', background:'#F5E8DA', color:'var(--primary-dark)', fontSize:11, fontFamily:'var(--font-round)', cursor:'pointer' }}>
+          <i className="ti ti-upload" style={{ fontSize:12 }} /> 匯入
+        </button>
+        <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display:'none' }} onChange={handleFileChange} />
+      </div>
+
+      {/* Import confirm */}
+      {importMode === 'confirm' && pendingImport && (
+        <div style={{ margin:'0 16px 14px', background:'#FDF5EC', border:'0.5px solid var(--card-border)', borderRadius:14, padding:16 }}>
+          <div style={{ fontWeight:700, fontSize:15, color:'var(--text)', marginBottom:6 }}>
+            <i className="ti ti-file-import" style={{ marginRight:6, color:'var(--primary)' }} />確認匯入
+          </div>
+          <div style={{ fontSize:13, color:'var(--text-sub)', marginBottom:14, lineHeight:1.6 }}>
+            檔案包含 <b>{(pendingImport.books||[]).length}</b> 本書、<b>{(pendingImport.records||[]).length}</b> 筆紀錄。<br />請選擇匯入方式：
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <button onClick={() => { importData(pendingImport,'merge'); setPendingImport(null); setImportMode(null); toast('✓ 合併完成！'); }}
+              style={{ padding:'10px 14px', borderRadius:10, border:'1.5px solid var(--primary)', background:'#F5E8DA', color:'var(--primary-dark)', fontSize:14, fontFamily:'var(--font-round)', cursor:'pointer', textAlign:'left' }}>
+              <b>合併</b> — 新書和紀錄加進來，已有的不動
+            </button>
+            <button onClick={() => { if (window.confirm('確定取代？現有資料將全部清除。')) { importData(pendingImport,'replace'); setPendingImport(null); setImportMode(null); toast('✓ 取代完成！'); } }}
+              style={{ padding:'10px 14px', borderRadius:10, border:'1.5px solid #E8A0A0', background:'#FFF0F0', color:'#C04040', fontSize:14, fontFamily:'var(--font-round)', cursor:'pointer', textAlign:'left' }}>
+              <b>取代</b> — 清除現有所有資料，換成檔案內容
+            </button>
+            <button onClick={() => { setPendingImport(null); setImportMode(null); }}
+              style={{ padding:8, borderRadius:10, border:'none', background:'none', color:'var(--text-light)', fontSize:13, fontFamily:'var(--font-round)', cursor:'pointer' }}>取消</button>
+          </div>
+        </div>
+      )}
+
+      {/* Book list */}
       {books.length === 0 ? (
         <div className="no-books">
           <i className="ti ti-book-2" />
-          還沒有書喔！點下方「+」開始記錄吧
+          還沒有書喔！點右下角「+」開始記錄吧
         </div>
       ) : (
         <>
-          <div style={{ padding: '4px 16px 6px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-sub)', letterSpacing: '0.08em', textTransform: 'uppercase', marginRight: 2 }}>藏書</span>
-            {[['all','全部'],['active','進行中'],['wantToRead','待讀'],['graduated','已畢業']].map(([v,l]) => {
-              const cnt = v==='all' ? books.length : v==='active' ? books.filter(b=>(b.status||'active')==='active').length : books.filter(b=>b.status===v).length;
-              return cnt > 0 ? (
-                <button key={v} onClick={() => setHomeFilter(v)} style={{
-                  padding: '4px 10px', borderRadius: 20, border: '1.5px solid',
-                  borderColor: homeFilter===v ? 'var(--primary)' : 'var(--card-border)',
-                  background: homeFilter===v ? '#F5E8DA' : 'var(--bg)',
-                  color: homeFilter===v ? 'var(--primary-dark)' : 'var(--text-sub)',
-                  fontSize: 11, fontWeight: homeFilter===v ? 700 : 400,
-                  fontFamily: 'var(--font-round)', cursor: 'pointer', flexShrink: 0
-                }}>{l} ({cnt})</button>
-              ) : null;
-            })}
-            <select value={homeSortBy} onChange={e => setHomeSortBy(e.target.value)} style={{
-              marginLeft: 'auto', padding: '4px 22px 4px 8px', borderRadius: 10,
-              border: '0.5px solid var(--card-border)', background: 'var(--bg)',
-              color: 'var(--text-sub)', fontSize: 11, fontFamily: 'var(--font-round)',
-              cursor: 'pointer', outline: 'none', flexShrink: 0,
-              backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A7848' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
-              backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', backgroundSize: '13px', appearance: 'none'
-            }}>
-              <option value="recent">最近共讀</option>
-              <option value="newest">最新加入</option>
-              <option value="az">書名 A-Z</option>
-              <option value="count">共讀次數</option>
-            </select>
-          </div>
-
           {seriesList.map((series, idx) => {
             const theme = SERIES_THEMES[idx % SERIES_THEMES.length];
             const booksInSeries = seriesMap[series];
@@ -766,41 +1004,18 @@ function Dashboard({ books, records, navigate }) {
             return (
               <div key={series} className="series-block">
                 <div className="series-header"
-                  style={{ background: theme.bg, borderRadius: isOpen ? '10px 10px 0 0' : '10px', border: '0.5px solid ' + theme.border, borderBottom: isOpen ? 'none' : '0.5px solid ' + theme.border }}
+                  style={{ background:theme.bg, borderRadius:isOpen?'10px 10px 0 0':'10px', border:'0.5px solid '+theme.border, borderBottom:isOpen?'none':'0.5px solid '+theme.border }}
                   onClick={() => toggleSeries(series)}>
                   <div className="series-header-left">
-                    <div className="series-dot" style={{ background: theme.dot }} />
-                    <span className="series-name" style={{ color: theme.text }}>{series}</span>
-                    <span className="series-count" style={{ color: theme.text }}>{booksInSeries.length} 本</span>
+                    <div className="series-dot" style={{ background:theme.dot }} />
+                    <span className="series-name" style={{ color:theme.text }}>{series}</span>
+                    <span className="series-count" style={{ color:theme.text }}>{booksInSeries.length} 本</span>
                   </div>
-                  <i className={'ti ti-chevron-down series-chevron' + (isOpen ? ' open' : '')} style={{ color: theme.dot }} />
+                  <i className={'ti ti-chevron-down series-chevron'+(isOpen?' open':'')} style={{ color:theme.dot }} />
                 </div>
                 {isOpen && (
-                  <div className="series-books" style={{ borderColor: theme.border }}>
-                    {booksInSeries.map(b => {
-                      const rc = readCountMap[b.id] || 0; const ld = lastReadMap[b.id];
-                      return (
-                        <div key={b.id} className="lib-book-row" onClick={() => navigate('add', { bookId: b.id })}>
-                          <div className="lib-spine" style={{ background: getSpineColor(b.id) }} />
-                          <div className="lib-book-info">
-                            <div className="lib-book-title">
-                              {b.title}
-                              {b.status === 'graduated' && <span style={{ fontSize: 11, marginLeft: 5, verticalAlign: 'middle' }}>🎓</span>}
-                              {b.status === 'wantToRead' && <span style={{ fontSize: 10, marginLeft: 5, padding: '1px 5px', borderRadius: 6, background: '#E4F0E8', color: '#3A8050', fontWeight: 600, verticalAlign: 'middle' }}>待讀</span>}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                              {b.author && <span className="lib-book-author">{b.author}</span>}
-                              {ld && <span className="date-chip">{fmtDate(ld)}</span>}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                            {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?starColor(b.rating):'#DDD0C0'}}/>)}</div>}
-                            {rc > 0 && <span style={{fontSize:11,color:'var(--text-light)'}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
-                            <button onClick={e=>{e.stopPropagation();navigate('add',{bookId:b.id});}} style={{fontSize:11,padding:'2px 7px',borderRadius:8,border:'1px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)'}}>+ 記錄</button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="series-books" style={{ borderColor:theme.border }}>
+                    {booksInSeries.map(b => <BookRow key={b.id} b={b} />)}
                   </div>
                 )}
               </div>
@@ -810,45 +1025,62 @@ function Dashboard({ books, records, navigate }) {
           {standaloneBooks.length > 0 && (
             <>
               {seriesList.length > 0 && <div className="standalone-header">單本書</div>}
-              <div style={{ margin: '0 16px 16px' }}>
-                <div className="series-books" style={{ borderRadius: 10, border: '0.5px solid var(--card-border)' }}>
-                  {standaloneBooks.map(b => {
-                    const rc = readCountMap[b.id] || 0; const ld = lastReadMap[b.id];
-                    return (
-                      <div key={b.id} className="lib-book-row" onClick={() => navigate('add', { bookId: b.id })}>
-                        <div className="lib-spine" style={{ background: getSpineColor(b.id) }} />
-                        <div className="lib-book-info">
-                          <div className="lib-book-title">
-                            {b.title}
-                            {b.status === 'graduated' && <span style={{ fontSize: 11, marginLeft: 5, verticalAlign: 'middle' }}>🎓</span>}
-                            {b.status === 'wantToRead' && <span style={{ fontSize: 10, marginLeft: 5, padding: '1px 5px', borderRadius: 6, background: '#E4F0E8', color: '#3A8050', fontWeight: 600, verticalAlign: 'middle' }}>待讀</span>}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                            {b.author && <span className="lib-book-author">{b.author}</span>}
-                            {ld && <span className="date-chip">{fmtDate(ld)}</span>}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                          {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?starColor(b.rating):'#DDD0C0'}}/>)}</div>}
-                          {rc > 0 && <span style={{fontSize:11,color:'var(--text-light)'}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
-                          <button onClick={e=>{e.stopPropagation();navigate('add',{bookId:b.id});}} style={{fontSize:11,padding:'2px 7px',borderRadius:8,border:'1px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)'}}>+ 記錄</button>
-                        </div>
-                      </div>
-                    );
-                  })}
+              <div style={{ margin:'0 16px 8px' }}>
+                <div className="series-books" style={{ borderRadius:10, border:'0.5px solid var(--card-border)' }}>
+                  {standaloneBooks.map(b => <BookRow key={b.id} b={b} />)}
                 </div>
               </div>
             </>
           )}
 
           {sortedBooks.length === 0 && (
-            <div className="empty-state">
-              <i className="ti ti-filter-off" />
-              <p>這個分類目前沒有書</p>
-            </div>
+            <div className="empty-state"><i className="ti ti-filter-off" /><p>這個分類目前沒有書</p></div>
           )}
         </>
       )}
+
+      {/* Add book */}
+      {showAddForm ? (
+        <div className="card add-book-form-card" style={{ marginTop:8 }}>
+          <div className="card-title"><i className="ti ti-book-plus" />新增書本</div>
+          <div className="form-group">
+            <label className="form-label">書名 *</label>
+            <input className="form-input" placeholder="e.g. Green Eggs and Ham" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">作者</label>
+            <input className="form-input" placeholder="作者名稱" value={newAuthor} onChange={e => setNewAuthor(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">系列（選填）</label>
+            <input className="form-input" placeholder="e.g. Pete the Cat" value={newSeries} onChange={e => setNewSeries(e.target.value)} list="add-series-list" />
+            <datalist id="add-series-list">{allSeriesList.map(s => <option key={s} value={s} />)}</datalist>
+          </div>
+          <div className="form-group">
+            <label className="form-label">備註（選填）</label>
+            <input className="form-input" placeholder="學習重點、特色等" value={newNotes} onChange={e => setNewNotes(e.target.value)} />
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button className="btn-primary" style={{ flex:1 }} onClick={handleSubmit}><i className="ti ti-check" /> 新增書本</button>
+            <button className="btn-secondary" onClick={() => { setShowAddForm(false); resetForm(); }}>取消</button>
+          </div>
+        </div>
+      ) : (
+        <button className="add-book-btn" onClick={() => { resetForm(); setShowAddForm(true); }}>
+          <i className="ti ti-plus" /> 新增書本
+        </button>
+      )}
+
+      <div style={{ textAlign:'center', padding:'4px 16px 16px' }}>
+        <button onClick={downloadTemplate} style={{ background:'none', border:'none', color:'var(--text-light)', fontSize:12, fontFamily:'var(--font-round)', cursor:'pointer', textDecoration:'underline' }}>
+          <i className="ti ti-file-spreadsheet" /> 下載匯入範本
+        </button>
+      </div>
+
+      {/* Fixed FAB */}
+      <button className="fab-fixed" onClick={() => navigate('add')}>
+        <i className="ti ti-plus" />
+      </button>
     </div>
   );
 }
@@ -922,8 +1154,11 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
   }, [newTitle, newAuthor, newSeries, newNotes, addBook, toast]);
 
   return (
-    <div className="page" style={{ paddingBottom: 'calc(var(--nav-h) + 16px)' }}>
+    <div className="page">
       <div className="page-header">
+        <button onClick={() => navigate('home')} style={{ background:'none', border:'none', color:'var(--primary)', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-round)', display:'flex', alignItems:'center', gap:4, padding:0, flexShrink:0 }}>
+          <i className="ti ti-arrow-left" /> 返回
+        </button>
         <i className="ti ti-pencil" style={{ color: 'var(--primary)', fontSize: 22 }} />
         <div className="page-header-title">記錄共讀</div>
       </div>
@@ -1582,11 +1817,6 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
   }, [books, records]);
 
   const panelNavigate = useCallback(() => closePanel(), [closePanel]);
-  // Library navigate: intercept 'add' to open panel instead of routing
-  const libraryNavigate = useCallback((p, params) => {
-    if (p === 'add') { openPanel(params?.bookId || ''); }
-    else { navigate(p); }
-  }, [navigate, openPanel]);
 
   return (
     <div className="d-layout">
@@ -1599,9 +1829,6 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
         <nav className="d-nav">
           <button className={'d-nav-btn' + (page === 'home' ? ' on' : '')} onClick={() => navigate('home')}>
             <i className="ti ti-home" /> 首頁
-          </button>
-          <button className={'d-nav-btn' + (page === 'library' ? ' on' : '')} onClick={() => navigate('library')}>
-            <i className="ti ti-books" /> 書單
           </button>
         </nav>
         <div className="d-stats-box">
@@ -1679,14 +1906,6 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
               )}
             </div>
           </>
-        )}
-        {page === 'library' && (
-          <BookLibrary
-            books={books} records={records}
-            addBook={addBook} deleteBook={deleteBook}
-            exportData={exportData} importData={importData}
-            navigate={libraryNavigate} toast={toast}
-          />
         )}
       </main>
 
@@ -1824,7 +2043,11 @@ function App() {
       ) : (
         <>
           {page === 'home' && (
-            <Dashboard books={books} records={records} navigate={navigate} />
+            <Dashboard
+              books={books} records={records} navigate={navigate}
+              addBook={addBook} deleteBook={deleteBook}
+              exportData={exportData} importData={importData} toast={toast}
+            />
           )}
           {page === 'add' && (
             <AddRecord
@@ -1836,20 +2059,6 @@ function App() {
               initialBookId={navParam.bookId || ''}
             />
           )}
-          {page === 'library' && (
-            <BookLibrary books={books} records={records} addBook={addBook} deleteBook={deleteBook} exportData={exportData} importData={importData} navigate={navigate} toast={toast} />
-          )}
-          <nav className="bottom-nav">
-            <button className={'nav-btn' + (page === 'home' ? ' on' : '')} onClick={() => navigate('home')}>
-              <i className="ti ti-home" /><span className="nl">首頁</span>
-            </button>
-            <button className="fab" onClick={() => navigate('add')}>
-              <i className="ti ti-plus" />
-            </button>
-            <button className={'nav-btn' + (page === 'library' ? ' on' : '')} onClick={() => navigate('library')}>
-              <i className="ti ti-books" /><span className="nl">書單</span>
-            </button>
-          </nav>
         </>
       )}
       {toastMsg && <Toast key={toastKey} msg={toastMsg} />}
