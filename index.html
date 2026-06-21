@@ -1012,7 +1012,7 @@ function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, 
           <i className="ti ti-plus" /> 新增書本
         </button>
       )}
-      {showAddForm ? (
+      {showAddForm && (
         <div className="card add-book-form-card" style={{ marginTop:8 }}>
           <div className="card-title"><i className="ti ti-book-plus" />新增書本</div>
           <div className="form-group">
