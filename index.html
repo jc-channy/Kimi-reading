@@ -1369,10 +1369,15 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
             </div>
           </div>
           {!batchMode && (
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
-              {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?starColor(b.rating):'#DDD0C0'}}/>)}</div>}
-              {rc > 0 && <span style={{fontSize:11,color:'var(--text-light)'}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
-              <button onClick={e=>{e.stopPropagation();setQuickLogBookId(b.id);}} style={{fontSize:11,padding:'3px 9px',borderRadius:8,border:'1px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)'}}>＋ 記錄</button>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0, paddingRight:10 }}>
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
+                {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?starColor(b.rating):'#DDD0C0'}}/>)}</div>}
+                {rc > 0 && <span style={{fontSize:11,color:'var(--text-light)'}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
+              </div>
+              <button onClick={e=>{e.stopPropagation();setQuickLogBookId(b.id);}} style={{width:56,height:56,borderRadius:14,border:'1.5px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,flexShrink:0}}>
+                <i className="ti ti-plus" style={{fontSize:20}} />
+                <span style={{fontSize:10,fontWeight:600}}>記錄</span>
+              </button>
             </div>
           )}
         </div>
