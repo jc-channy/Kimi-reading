@@ -950,7 +950,7 @@ function BookDetail({ book, books, records, addRecord, toast, onBack, onEdit }) 
 /* ═══════════════════════════════════════
    Dashboard (merged with BookLibrary)
 ═══════════════════════════════════════ */
-function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, exportData, importData, toast, addBookTrigger, hideAddBtn, hideImportExport, editTrigger }) {
+function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, exportData, importData, toast, addBookTrigger, hideAddBtn, hideImportExport, hideHero, editTrigger }) {
   // ── Stats ──
   const totalDays = useMemo(() => new Set(records.map(r => r.date)).size, [records]);
 
@@ -1431,16 +1431,18 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
   return (
     <div className="page">
       {/* Hero */}
-      <div className="hero">
-        <div className="hero-title">📖 Kimi 的英文共讀</div>
-        <div className="hero-sub">每一天的聆聽，都是成長的足跡</div>
-        <div className="hero-stats">
-          <div className="stat-pill"><i className="ti ti-calendar-heart" />{totalDays}<span>共讀天數</span></div>
-          <div className="stat-pill"><i className="ti ti-books" />{books.length}<span>本書</span></div>
-          {streak > 0 && <div className="stat-pill"><i className="ti ti-flame" style={{ color:'#E87840' }} />{streak}<span>連續天</span></div>}
-          <div className="stat-pill"><i className="ti ti-calendar-month" />{thisMonth}<span>本月</span></div>
+      {!hideHero && (
+        <div className="hero">
+          <div className="hero-title">📖 Kimi 的英文共讀</div>
+          <div className="hero-sub">每一天的聆聽，都是成長的足跡</div>
+          <div className="hero-stats">
+            <div className="stat-pill"><i className="ti ti-calendar-heart" />{totalDays}<span>共讀天數</span></div>
+            <div className="stat-pill"><i className="ti ti-books" />{books.length}<span>本書</span></div>
+            {streak > 0 && <div className="stat-pill"><i className="ti ti-flame" style={{ color:'#E87840' }} />{streak}<span>連續天</span></div>}
+            <div className="stat-pill"><i className="ti ti-calendar-month" />{thisMonth}<span>本月</span></div>
+          </div>
         </div>
-      </div>
+      )}
 
 
       {/* Search */}
@@ -2557,34 +2559,34 @@ function RecordsDashboard({ books, records, navigate }) {
    DesktopAddBookPage
 ═══════════════════════════════════════ */
 function DesktopAddBookPage({ books, addBook, exportData, importData, toast }) {
-  const [newTitle, setNewTitle] = useState('');
-  const [newAuthor, setNewAuthor] = useState('');
-  const [newSeries, setNewSeries] = useState('');
-  const [newNotes, setNewNotes] = useState('');
+  const emptyRow = () => ({ id: genId(), title: '', author: '', series: '', notes: '' });
+  const [rows, setRows] = useState([emptyRow()]);
   const [importMode, setImportMode] = useState(null);
   const [pendingImport, setPendingImport] = useState(null);
   const fileInputRef = React.useRef(null);
 
   const allSeriesList = useMemo(() => [...new Set(books.filter(b => b.series).map(b => b.series))], [books]);
 
-  const resetForm = () => { setNewTitle(''); setNewAuthor(''); setNewSeries(''); setNewNotes(''); };
+  const updateRow = (id, field, val) => setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
+  const addRow = () => setRows(prev => [...prev, emptyRow()]);
+  const removeRow = (id) => setRows(prev => prev.length > 1 ? prev.filter(r => r.id !== id) : [emptyRow()]);
 
-  const handleSubmit = () => {
-    if (!newTitle.trim()) { toast('請輸入書名'); return; }
-    addBook({ id: genId(), title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), notes: newNotes.trim(), rating: 0, status: 'active', createdAt: today() });
-    toast('書本已新增！');
-    resetForm();
+  const validRows = rows.filter(r => r.title.trim());
+
+  const handleSubmitAll = () => {
+    if (validRows.length === 0) { toast('請至少輸入一本書名'); return; }
+    validRows.forEach(r => {
+      addBook({ id: genId(), title: r.title.trim(), author: r.author.trim(), series: r.series.trim(), notes: r.notes.trim(), rating: 0, status: 'active', createdAt: today() });
+    });
+    toast(`已新增 ${validRows.length} 本書！`);
+    setRows([emptyRow()]);
   };
 
   const ROW_COL_MAP = {
-    '書名': 'title', 'title': 'title',
-    '作者': 'author', 'author': 'author',
-    '系列': 'series', 'series': 'series',
-    '書本備註': 'notes', 'notes': 'notes',
-    '星星': 'rating', 'rating': 'rating',
-    '狀態': 'status', 'status': 'status',
-    '日期': 'date', 'date': 'date',
-    '時間': 'duration', 'duration': 'duration',
+    '書名': 'title', 'title': 'title', '作者': 'author', 'author': 'author',
+    '系列': 'series', 'series': 'series', '書本備註': 'notes', 'notes': 'notes',
+    '星星': 'rating', 'rating': 'rating', '狀態': 'status', 'status': 'status',
+    '日期': 'date', 'date': 'date', '時間': 'duration', 'duration': 'duration',
     '反應': 'leloReaction', 'leloreaction': 'leloReaction',
     '跟著唸': 'leloFollowed', 'lelofollowed': 'leloFollowed',
     '學到的句子': 'leloSentences', 'lelosentences': 'leloSentences',
@@ -2610,8 +2612,7 @@ function DesktopAddBookPage({ books, addBook, exportData, importData, toast }) {
     rows.forEach(r => {
       if (!bookByTitle[r.title]) {
         const rawSt = r.status;
-        const bookSt = rawSt === '已畢業' || rawSt === true || rawSt === '是' ? 'graduated'
-          : rawSt === '待讀' ? 'wantToRead' : 'active';
+        const bookSt = rawSt === '已畢業' || rawSt === true || rawSt === '是' ? 'graduated' : rawSt === '待讀' ? 'wantToRead' : 'active';
         bookByTitle[r.title] = { id: genId(), title: r.title, author: r.author||'', series: r.series||'', notes: r.notes||'', rating: parseInt(r.rating)||0, status: bookSt, createdAt: today() };
       }
     });
@@ -2649,8 +2650,7 @@ function DesktopAddBookPage({ books, addBook, exportData, importData, toast }) {
 
   const downloadTemplate = () => {
     const wb = XLSX.utils.book_new();
-    const data = [
-      HEADERS,
+    const data = [HEADERS,
       ['I Love My White Shoes', 'James Dean', 'Pete the Cat', '重複句型', 5, '', '2026-06-10', '20分鐘', 'love', '是', 'no matter what', ''],
       ['Brown Bear, Brown Bear', 'Bill Martin Jr.', '', '重複句型好學', 4, '', '2026-06-12', '15分鐘', 'like', '是', 'What do you see?', ''],
     ];
@@ -2658,73 +2658,105 @@ function DesktopAddBookPage({ books, addBook, exportData, importData, toast }) {
     XLSX.writeFile(wb, 'lele-reading-template.xlsx');
   };
 
+  const inputStyle = { width:'100%', padding:'5px 8px', borderRadius:8, border:'0.5px solid var(--card-border)', background:'var(--bg)', color:'var(--text)', fontSize:13, fontFamily:'var(--font-round)', outline:'none' };
+
   return (
-    <div style={{ padding: '32px 40px', maxWidth: 640 }}>
-      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 28 }}>
+    <div style={{ padding: '28px 40px', maxWidth: 820 }}>
+      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 24 }}>
         <i className="ti ti-book-plus" style={{ marginRight: 8, color: 'var(--primary)' }} />新增書本
       </div>
 
-      {/* Add book form */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div className="form-group">
-          <label className="form-label">書名 *</label>
-          <input className="form-input" placeholder="e.g. Green Eggs and Ham" value={newTitle} onChange={e => setNewTitle(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">作者</label>
-          <input className="form-input" placeholder="作者名稱" value={newAuthor} onChange={e => setNewAuthor(e.target.value)} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">系列（選填）</label>
-          <input className="form-input" placeholder="e.g. Pete the Cat" value={newSeries} onChange={e => setNewSeries(e.target.value)} list="dsk-series-list" />
-          <datalist id="dsk-series-list">{allSeriesList.map(s => <option key={s} value={s} />)}</datalist>
-        </div>
-        <div className="form-group">
-          <label className="form-label">備註（選填）</label>
-          <input className="form-input" placeholder="學習重點、特色等" value={newNotes} onChange={e => setNewNotes(e.target.value)} />
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-          <button className="btn-primary" style={{ flex: 1 }} onClick={handleSubmit}><i className="ti ti-check" /> 新增書本</button>
-          <button className="btn-secondary" onClick={resetForm}>清空</button>
+      {/* Batch table */}
+      <div className="card" style={{ marginBottom: 24, padding: '16px 20px' }}>
+        <table style={{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed' }}>
+          <colgroup>
+            <col style={{ width:28 }} /><col style={{ width:'35%' }} /><col style={{ width:'22%' }} /><col style={{ width:'22%' }} /><col /><col style={{ width:32 }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th style={{ padding:'0 0 8px', color:'var(--text-light)', fontSize:11 }}></th>
+              <th style={{ padding:'0 6px 8px', color:'var(--text-sub)', fontSize:12, fontWeight:600, textAlign:'left' }}>書名 *</th>
+              <th style={{ padding:'0 6px 8px', color:'var(--text-sub)', fontSize:12, fontWeight:600, textAlign:'left' }}>作者</th>
+              <th style={{ padding:'0 6px 8px', color:'var(--text-sub)', fontSize:12, fontWeight:600, textAlign:'left' }}>系列</th>
+              <th style={{ padding:'0 6px 8px', color:'var(--text-sub)', fontSize:12, fontWeight:600, textAlign:'left' }}>備註</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, idx) => (
+              <tr key={r.id}>
+                <td style={{ textAlign:'center', color:'var(--text-light)', fontSize:11, paddingBottom:6 }}>{idx + 1}</td>
+                <td style={{ padding:'0 6px 6px' }}>
+                  <input style={{ ...inputStyle, borderColor: r.title ? 'var(--card-border)' : undefined }}
+                    placeholder="書名…" value={r.title} onChange={e => updateRow(r.id, 'title', e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Tab' && idx === rows.length - 1 && !e.shiftKey) { e.preventDefault(); addRow(); } }} />
+                </td>
+                <td style={{ padding:'0 6px 6px' }}>
+                  <input style={inputStyle} placeholder="作者" value={r.author} onChange={e => updateRow(r.id, 'author', e.target.value)} />
+                </td>
+                <td style={{ padding:'0 6px 6px' }}>
+                  <input style={inputStyle} placeholder="系列" value={r.series} onChange={e => updateRow(r.id, 'series', e.target.value)} list="batch-series-list" />
+                </td>
+                <td style={{ padding:'0 6px 6px' }}>
+                  <input style={inputStyle} placeholder="備註" value={r.notes} onChange={e => updateRow(r.id, 'notes', e.target.value)} />
+                </td>
+                <td style={{ paddingBottom:6, textAlign:'center' }}>
+                  <button onClick={() => removeRow(r.id)} style={{ width:22, height:22, borderRadius:6, border:'none', background:'none', color:'var(--text-light)', cursor:'pointer', fontSize:15, lineHeight:1, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <datalist id="batch-series-list">{allSeriesList.map(s => <option key={s} value={s} />)}</datalist>
+
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8, paddingTop:10, borderTop:'0.5px solid var(--card-border)' }}>
+          <button onClick={addRow} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 12px', borderRadius:8, border:'0.5px dashed var(--card-border)', background:'none', color:'var(--text-sub)', fontSize:12, fontFamily:'var(--font-round)', cursor:'pointer' }}>
+            <i className="ti ti-plus" style={{ fontSize:13 }} /> 新增一行
+          </button>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            {validRows.length > 0 && <span style={{ fontSize:12, color:'var(--text-light)' }}>{validRows.length} 本書待新增</span>}
+            <button onClick={() => setRows([emptyRow()])} style={{ padding:'6px 12px', borderRadius:20, border:'0.5px solid var(--card-border)', background:'none', color:'var(--text-sub)', fontSize:12, fontFamily:'var(--font-round)', cursor:'pointer' }}>清空</button>
+            <button className="btn-primary" onClick={handleSubmitAll} style={{ padding:'7px 20px' }}>
+              <i className="ti ti-check" /> 全部新增
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Import / Export */}
-      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>匯入 / 匯出</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-sub)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>匯入 / 匯出</div>
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={exportData} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 20, border: '1.5px solid var(--card-border)', background: 'var(--bg)', color: 'var(--text-sub)', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>
-            <i className="ti ti-download" style={{ fontSize: 14 }} /> 匯出 .xlsx
+          <button onClick={exportData} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:20, border:'1.5px solid var(--card-border)', background:'var(--bg)', color:'var(--text-sub)', fontSize:13, fontFamily:'var(--font-round)', cursor:'pointer' }}>
+            <i className="ti ti-download" style={{ fontSize:14 }} /> 匯出 .xlsx
           </button>
-          <button onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 20, border: '1.5px solid var(--primary)', background: '#F5E8DA', color: 'var(--primary-dark)', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>
-            <i className="ti ti-upload" style={{ fontSize: 14 }} /> 匯入檔案
+          <button onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:20, border:'1.5px solid var(--primary)', background:'#F5E8DA', color:'var(--primary-dark)', fontSize:13, fontFamily:'var(--font-round)', cursor:'pointer' }}>
+            <i className="ti ti-upload" style={{ fontSize:14 }} /> 匯入檔案
           </button>
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFileChange} />
-          <button onClick={downloadTemplate} style={{ background: 'none', border: 'none', color: 'var(--text-light)', fontSize: 12, fontFamily: 'var(--font-round)', cursor: 'pointer', textDecoration: 'underline', padding: '4px 0' }}>
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display:'none' }} onChange={handleFileChange} />
+          <button onClick={downloadTemplate} style={{ background:'none', border:'none', color:'var(--text-light)', fontSize:12, fontFamily:'var(--font-round)', cursor:'pointer', textDecoration:'underline', padding:'4px 0' }}>
             <i className="ti ti-file-spreadsheet" /> 下載匯入範本
           </button>
         </div>
-
         {importMode === 'confirm' && pendingImport && (
-          <div style={{ marginTop: 16, background: '#FDF5EC', border: '0.5px solid var(--card-border)', borderRadius: 12, padding: 16 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', marginBottom: 6 }}>
-              <i className="ti ti-file-import" style={{ marginRight: 6, color: 'var(--primary)' }} />確認匯入
+          <div style={{ marginTop:14, background:'#FDF5EC', border:'0.5px solid var(--card-border)', borderRadius:12, padding:14 }}>
+            <div style={{ fontWeight:700, fontSize:14, color:'var(--text)', marginBottom:6 }}>
+              <i className="ti ti-file-import" style={{ marginRight:6, color:'var(--primary)' }} />確認匯入
             </div>
-            <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 14, lineHeight: 1.6 }}>
+            <div style={{ fontSize:13, color:'var(--text-sub)', marginBottom:12, lineHeight:1.6 }}>
               檔案包含 <b>{(pendingImport.books||[]).length}</b> 本書、<b>{(pendingImport.records||[]).length}</b> 筆紀錄。請選擇匯入方式：
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { importData(pendingImport, 'merge'); setPendingImport(null); setImportMode(null); toast('✓ 合併完成！'); }}
-                style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--primary)', background: '#F5E8DA', color: 'var(--primary-dark)', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => { importData(pendingImport,'merge'); setPendingImport(null); setImportMode(null); toast('✓ 合併完成！'); }}
+                style={{ flex:1, padding:'9px 14px', borderRadius:10, border:'1.5px solid var(--primary)', background:'#F5E8DA', color:'var(--primary-dark)', fontSize:13, fontFamily:'var(--font-round)', cursor:'pointer' }}>
                 <b>合併</b> — 加進來，不覆蓋
               </button>
-              <button onClick={() => { if (window.confirm('確定取代？現有資料將全部清除。')) { importData(pendingImport, 'replace'); setPendingImport(null); setImportMode(null); toast('✓ 取代完成！'); } }}
-                style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1.5px solid #E8A0A0', background: '#FFF0F0', color: '#C04040', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>
+              <button onClick={() => { if (window.confirm('確定取代？現有資料將全部清除。')) { importData(pendingImport,'replace'); setPendingImport(null); setImportMode(null); toast('✓ 取代完成！'); } }}
+                style={{ flex:1, padding:'9px 14px', borderRadius:10, border:'1.5px solid #E8A0A0', background:'#FFF0F0', color:'#C04040', fontSize:13, fontFamily:'var(--font-round)', cursor:'pointer' }}>
                 <b>取代</b> — 清除重新來
               </button>
               <button onClick={() => { setPendingImport(null); setImportMode(null); }}
-                style={{ padding: '10px 12px', borderRadius: 10, border: 'none', background: 'none', color: 'var(--text-light)', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>取消</button>
+                style={{ padding:'9px 12px', borderRadius:10, border:'none', background:'none', color:'var(--text-light)', fontSize:13, fontFamily:'var(--font-round)', cursor:'pointer' }}>取消</button>
             </div>
           </div>
         )}
@@ -2740,6 +2772,24 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
   const [dsktView, setDsktView] = useState('books'); // 'books' | 'addbook' | 'detail'
   const [dsktDetailBookId, setDsktDetailBookId] = useState('');
   const [editTrigger, setEditTrigger] = useState({ n: 0, bookId: null });
+
+  const totalDays = useMemo(() => new Set(records.map(r => r.date)).size, [records]);
+  const thisMonth = useMemo(() => {
+    const prefix = today().slice(0, 7);
+    return records.filter(r => r.date && r.date.startsWith(prefix)).length;
+  }, [records]);
+  const streak = useMemo(() => {
+    if (records.length === 0) return 0;
+    const readDates = new Set(records.map(r => r.date));
+    let count = 0;
+    const d = new Date();
+    while (true) {
+      const ds = d.toISOString().slice(0, 10);
+      if (readDates.has(ds)) { count++; d.setDate(d.getDate() - 1); }
+      else break;
+    }
+    return count;
+  }, [records]);
 
   const desktopNavigate = useCallback((p, params) => {
     if (p === 'detail') {
@@ -2758,6 +2808,26 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
           <div className="d-logo-title">📖 Kimi 共讀</div>
           <div className="d-logo-sub">英文有聲書紀錄</div>
         </div>
+        <div className="d-stats-box" style={{ margin: '12px 12px 4px' }}>
+          <div className="d-stat-row">
+            <div className="d-stat-label"><i className="ti ti-books" />本書</div>
+            <div className="d-stat-val">{books.length}</div>
+          </div>
+          <div className="d-stat-row">
+            <div className="d-stat-label"><i className="ti ti-calendar-heart" />共讀天數</div>
+            <div className="d-stat-val">{totalDays}</div>
+          </div>
+          <div className="d-stat-row">
+            <div className="d-stat-label"><i className="ti ti-calendar-month" />本月</div>
+            <div className="d-stat-val">{thisMonth}</div>
+          </div>
+          {streak > 0 && (
+            <div className="d-stat-row">
+              <div className="d-stat-label"><i className="ti ti-flame" style={{ color:'#E87840' }} />連續天</div>
+              <div className="d-stat-val">{streak}</div>
+            </div>
+          )}
+        </div>
         <nav className="d-nav">
           <button className={'d-nav-btn' + ((dsktView === 'books' || dsktView === 'detail') ? ' on' : '')} onClick={() => setDsktView('books')}>
             <i className="ti ti-books" /> 藏書列表
@@ -2775,7 +2845,7 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
             books={books} records={records} navigate={desktopNavigate}
             addRecord={addRecord} addBook={addBook} deleteBook={deleteBook}
             exportData={exportData} importData={importData} toast={toast}
-            hideAddBtn={true} hideImportExport={true}
+            hideAddBtn={true} hideImportExport={true} hideHero={true}
             editTrigger={editTrigger}
           />
         )}
