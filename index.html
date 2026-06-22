@@ -950,7 +950,7 @@ function BookDetail({ book, books, records, addRecord, toast, onBack, onEdit }) 
 /* ═══════════════════════════════════════
    Dashboard (merged with BookLibrary)
 ═══════════════════════════════════════ */
-function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, exportData, importData, toast, addBookTrigger, hideAddBtn, editTrigger }) {
+function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, exportData, importData, toast, addBookTrigger, hideAddBtn, hideImportExport, editTrigger }) {
   // ── Stats ──
   const totalDays = useMemo(() => new Set(records.map(r => r.date)).size, [records]);
 
@@ -1487,17 +1487,19 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
           <option value="count">共讀次數</option>
           <option value="manual">手動排序</option>
         </select>
-        <button onClick={exportData} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 9px', borderRadius:16, border:'0.5px solid var(--card-border)', background:'var(--bg)', color:'var(--text-light)', fontSize:11, fontFamily:'var(--font-round)', cursor:'pointer' }}>
-          <i className="ti ti-download" style={{ fontSize:12 }} /> 匯出
-        </button>
-        <button onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 9px', borderRadius:16, border:'0.5px solid var(--primary)', background:'#F5E8DA', color:'var(--primary-dark)', fontSize:11, fontFamily:'var(--font-round)', cursor:'pointer' }}>
-          <i className="ti ti-upload" style={{ fontSize:12 }} /> 匯入
-        </button>
-        <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display:'none' }} onChange={handleFileChange} />
+        {!hideImportExport && <>
+          <button onClick={exportData} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 9px', borderRadius:16, border:'0.5px solid var(--card-border)', background:'var(--bg)', color:'var(--text-light)', fontSize:11, fontFamily:'var(--font-round)', cursor:'pointer' }}>
+            <i className="ti ti-download" style={{ fontSize:12 }} /> 匯出
+          </button>
+          <button onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 9px', borderRadius:16, border:'0.5px solid var(--primary)', background:'#F5E8DA', color:'var(--primary-dark)', fontSize:11, fontFamily:'var(--font-round)', cursor:'pointer' }}>
+            <i className="ti ti-upload" style={{ fontSize:12 }} /> 匯入
+          </button>
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display:'none' }} onChange={handleFileChange} />
+        </>}
       </div>
 
       {/* Import confirm */}
-      {importMode === 'confirm' && pendingImport && (
+      {!hideImportExport && importMode === 'confirm' && pendingImport && (
         <div style={{ margin:'0 16px 14px', background:'#FDF5EC', border:'0.5px solid var(--card-border)', borderRadius:14, padding:16 }}>
           <div style={{ fontWeight:700, fontSize:15, color:'var(--text)', marginBottom:6 }}>
             <i className="ti ti-file-import" style={{ marginRight:6, color:'var(--primary)' }} />確認匯入
@@ -1619,11 +1621,13 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
         </div>
       )}
 
-      <div style={{ textAlign:'center', padding:'4px 16px 16px' }}>
-        <button onClick={downloadTemplate} style={{ background:'none', border:'none', color:'var(--text-light)', fontSize:12, fontFamily:'var(--font-round)', cursor:'pointer', textDecoration:'underline' }}>
-          <i className="ti ti-file-spreadsheet" /> 下載匯入範本
-        </button>
-      </div>
+      {!hideImportExport && (
+        <div style={{ textAlign:'center', padding:'4px 16px 16px' }}>
+          <button onClick={downloadTemplate} style={{ background:'none', border:'none', color:'var(--text-light)', fontSize:12, fontFamily:'var(--font-round)', cursor:'pointer', textDecoration:'underline' }}>
+            <i className="ti ti-file-spreadsheet" /> 下載匯入範本
+          </button>
+        </div>
+      )}
 
       {/* Fixed FAB */}
       <button className="fab-fixed" onClick={() => navigate('add')}>
@@ -2550,38 +2554,200 @@ function RecordsDashboard({ books, records, navigate }) {
 }
 
 /* ═══════════════════════════════════════
+   DesktopAddBookPage
+═══════════════════════════════════════ */
+function DesktopAddBookPage({ books, addBook, exportData, importData, toast }) {
+  const [newTitle, setNewTitle] = useState('');
+  const [newAuthor, setNewAuthor] = useState('');
+  const [newSeries, setNewSeries] = useState('');
+  const [newNotes, setNewNotes] = useState('');
+  const [importMode, setImportMode] = useState(null);
+  const [pendingImport, setPendingImport] = useState(null);
+  const fileInputRef = React.useRef(null);
+
+  const allSeriesList = useMemo(() => [...new Set(books.filter(b => b.series).map(b => b.series))], [books]);
+
+  const resetForm = () => { setNewTitle(''); setNewAuthor(''); setNewSeries(''); setNewNotes(''); };
+
+  const handleSubmit = () => {
+    if (!newTitle.trim()) { toast('請輸入書名'); return; }
+    addBook({ id: genId(), title: newTitle.trim(), author: newAuthor.trim(), series: newSeries.trim(), notes: newNotes.trim(), rating: 0, status: 'active', createdAt: today() });
+    toast('書本已新增！');
+    resetForm();
+  };
+
+  const ROW_COL_MAP = {
+    '書名': 'title', 'title': 'title',
+    '作者': 'author', 'author': 'author',
+    '系列': 'series', 'series': 'series',
+    '書本備註': 'notes', 'notes': 'notes',
+    '星星': 'rating', 'rating': 'rating',
+    '狀態': 'status', 'status': 'status',
+    '日期': 'date', 'date': 'date',
+    '時間': 'duration', 'duration': 'duration',
+    '反應': 'leloReaction', 'leloreaction': 'leloReaction',
+    '跟著唸': 'leloFollowed', 'lelofollowed': 'leloFollowed',
+    '學到的句子': 'leloSentences', 'lelosentences': 'leloSentences',
+    '媽媽觀察': 'momNotes', 'momnotes': 'momNotes',
+  };
+
+  const parseSheet = (sheet, colMap) => {
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', header: 1 });
+    let headerIdx = 0;
+    for (let i = 0; i < Math.min(rawRows.length, 5); i++) {
+      if (rawRows[i].some(c => colMap[String(c).trim()])) { headerIdx = i; break; }
+    }
+    const headers = rawRows[headerIdx].map(c => String(c).trim());
+    return rawRows.slice(headerIdx + 1).map(row => {
+      const obj = {};
+      headers.forEach((h, i) => { const k = colMap[h] || colMap[h.toLowerCase()]; if (k) obj[k] = row[i] ?? ''; });
+      return obj;
+    });
+  };
+
+  const processRows = (rows) => {
+    const bookByTitle = {};
+    rows.forEach(r => {
+      if (!bookByTitle[r.title]) {
+        const rawSt = r.status;
+        const bookSt = rawSt === '已畢業' || rawSt === true || rawSt === '是' ? 'graduated'
+          : rawSt === '待讀' ? 'wantToRead' : 'active';
+        bookByTitle[r.title] = { id: genId(), title: r.title, author: r.author||'', series: r.series||'', notes: r.notes||'', rating: parseInt(r.rating)||0, status: bookSt, createdAt: today() };
+      }
+    });
+    const parsedBooks = Object.values(bookByTitle);
+    const parsedRecs = [];
+    rows.filter(r => r.date).forEach(r => {
+      const dates = String(r.date).split(',').map(d => d.trim()).filter(Boolean).sort();
+      const latestDate = dates[dates.length - 1];
+      dates.forEach(d => {
+        const isLatest = d === latestDate;
+        parsedRecs.push({ id: genId(), bookId: bookByTitle[r.title]?.id || '', bookTitle: r.title, date: d, duration: isLatest ? (r.duration || '20分鐘') : '', leloReaction: isLatest ? (r.leloReaction || '') : '', leloFollowed: isLatest ? (r.leloFollowed === true || r.leloFollowed === '是') : false, leloSentences: isLatest ? (r.leloSentences || '') : '', momNotes: isLatest ? (r.momNotes || '') : '', createdAt: today() });
+      });
+    });
+    setPendingImport({ books: parsedBooks, records: parsedRecs });
+    setImportMode('confirm');
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    const isCsv = file.name.toLowerCase().endsWith('.csv');
+    reader.onload = (ev) => {
+      try {
+        let wb;
+        if (isCsv) { wb = XLSX.read(ev.target.result, { type: 'string' }); }
+        else { wb = XLSX.read(ev.target.result, { type: 'array' }); }
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        processRows(parseSheet(sheet, ROW_COL_MAP).filter(r => r.title));
+      } catch (err) { toast('讀取失敗：' + err.message); }
+    };
+    if (isCsv) { reader.readAsText(file, 'UTF-8'); } else { reader.readAsArrayBuffer(file); }
+    e.target.value = '';
+  };
+
+  const downloadTemplate = () => {
+    const wb = XLSX.utils.book_new();
+    const data = [
+      HEADERS,
+      ['I Love My White Shoes', 'James Dean', 'Pete the Cat', '重複句型', 5, '', '2026-06-10', '20分鐘', 'love', '是', 'no matter what', ''],
+      ['Brown Bear, Brown Bear', 'Bill Martin Jr.', '', '重複句型好學', 4, '', '2026-06-12', '15分鐘', 'like', '是', 'What do you see?', ''],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), '共讀紀錄');
+    XLSX.writeFile(wb, 'lele-reading-template.xlsx');
+  };
+
+  return (
+    <div style={{ padding: '32px 40px', maxWidth: 640 }}>
+      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 28 }}>
+        <i className="ti ti-book-plus" style={{ marginRight: 8, color: 'var(--primary)' }} />新增書本
+      </div>
+
+      {/* Add book form */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="form-group">
+          <label className="form-label">書名 *</label>
+          <input className="form-input" placeholder="e.g. Green Eggs and Ham" value={newTitle} onChange={e => setNewTitle(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">作者</label>
+          <input className="form-input" placeholder="作者名稱" value={newAuthor} onChange={e => setNewAuthor(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">系列（選填）</label>
+          <input className="form-input" placeholder="e.g. Pete the Cat" value={newSeries} onChange={e => setNewSeries(e.target.value)} list="dsk-series-list" />
+          <datalist id="dsk-series-list">{allSeriesList.map(s => <option key={s} value={s} />)}</datalist>
+        </div>
+        <div className="form-group">
+          <label className="form-label">備註（選填）</label>
+          <input className="form-input" placeholder="學習重點、特色等" value={newNotes} onChange={e => setNewNotes(e.target.value)} />
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button className="btn-primary" style={{ flex: 1 }} onClick={handleSubmit}><i className="ti ti-check" /> 新增書本</button>
+          <button className="btn-secondary" onClick={resetForm}>清空</button>
+        </div>
+      </div>
+
+      {/* Import / Export */}
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-sub)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>匯入 / 匯出</div>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={exportData} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 20, border: '1.5px solid var(--card-border)', background: 'var(--bg)', color: 'var(--text-sub)', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>
+            <i className="ti ti-download" style={{ fontSize: 14 }} /> 匯出 .xlsx
+          </button>
+          <button onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 20, border: '1.5px solid var(--primary)', background: '#F5E8DA', color: 'var(--primary-dark)', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>
+            <i className="ti ti-upload" style={{ fontSize: 14 }} /> 匯入檔案
+          </button>
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFileChange} />
+          <button onClick={downloadTemplate} style={{ background: 'none', border: 'none', color: 'var(--text-light)', fontSize: 12, fontFamily: 'var(--font-round)', cursor: 'pointer', textDecoration: 'underline', padding: '4px 0' }}>
+            <i className="ti ti-file-spreadsheet" /> 下載匯入範本
+          </button>
+        </div>
+
+        {importMode === 'confirm' && pendingImport && (
+          <div style={{ marginTop: 16, background: '#FDF5EC', border: '0.5px solid var(--card-border)', borderRadius: 12, padding: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', marginBottom: 6 }}>
+              <i className="ti ti-file-import" style={{ marginRight: 6, color: 'var(--primary)' }} />確認匯入
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 14, lineHeight: 1.6 }}>
+              檔案包含 <b>{(pendingImport.books||[]).length}</b> 本書、<b>{(pendingImport.records||[]).length}</b> 筆紀錄。請選擇匯入方式：
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { importData(pendingImport, 'merge'); setPendingImport(null); setImportMode(null); toast('✓ 合併完成！'); }}
+                style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--primary)', background: '#F5E8DA', color: 'var(--primary-dark)', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>
+                <b>合併</b> — 加進來，不覆蓋
+              </button>
+              <button onClick={() => { if (window.confirm('確定取代？現有資料將全部清除。')) { importData(pendingImport, 'replace'); setPendingImport(null); setImportMode(null); toast('✓ 取代完成！'); } }}
+                style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1.5px solid #E8A0A0', background: '#FFF0F0', color: '#C04040', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>
+                <b>取代</b> — 清除重新來
+              </button>
+              <button onClick={() => { setPendingImport(null); setImportMode(null); }}
+                style={{ padding: '10px 12px', borderRadius: 10, border: 'none', background: 'none', color: 'var(--text-light)', fontSize: 13, fontFamily: 'var(--font-round)', cursor: 'pointer' }}>取消</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
    DesktopLayout
 ═══════════════════════════════════════ */
 function DesktopLayout({ books, records, page, navigate, addRecord, addBook, deleteBook, exportData, importData, toast }) {
-  const [dsktView, setDsktView] = useState('books'); // 'books' | 'records' | 'add' | 'detail'
+  const [dsktView, setDsktView] = useState('books'); // 'books' | 'addbook' | 'detail'
   const [dsktDetailBookId, setDsktDetailBookId] = useState('');
   const [editTrigger, setEditTrigger] = useState({ n: 0, bookId: null });
-  const [addBookTrigger, setAddBookTrigger] = useState(0);
-  const [addRecordKey, setAddRecordKey] = useState(0);
-  const [addRecordInitialBookId, setAddRecordInitialBookId] = useState('');
 
   const desktopNavigate = useCallback((p, params) => {
-    if (p === 'add') {
-      setAddRecordInitialBookId(params?.bookId || '');
-      setAddRecordKey(k => k + 1);
-      setDsktView('add');
-    } else if (p === 'detail') {
+    if (p === 'detail') {
       setDsktDetailBookId(params?.bookId || '');
       setDsktView('detail');
     } else {
       setDsktView('books');
     }
-  }, []);
-
-  const handleNewRecord = useCallback(() => {
-    setAddRecordInitialBookId('');
-    setAddRecordKey(k => k + 1);
-    setDsktView('add');
-  }, []);
-
-  const handleAddBook = useCallback(() => {
-    setDsktView('books');
-    setAddBookTrigger(n => n + 1);
   }, []);
 
   return (
@@ -2594,18 +2760,12 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
         </div>
         <nav className="d-nav">
           <button className={'d-nav-btn' + ((dsktView === 'books' || dsktView === 'detail') ? ' on' : '')} onClick={() => setDsktView('books')}>
-            <i className="ti ti-books" /> 書單
+            <i className="ti ti-books" /> 藏書列表
           </button>
-          <button className={'d-nav-btn' + (dsktView === 'records' ? ' on' : '')} onClick={() => setDsktView('records')}>
-            <i className="ti ti-chart-bar" /> 共讀紀錄
-          </button>
-          <button className={'d-nav-btn' + (dsktView === 'add' ? ' on' : '')} onClick={handleNewRecord}>
-            <i className="ti ti-plus" /> 新增記錄
+          <button className={'d-nav-btn' + (dsktView === 'addbook' ? ' on' : '')} onClick={() => setDsktView('addbook')}>
+            <i className="ti ti-book-plus" /> 新增書本
           </button>
         </nav>
-        <button className="d-add-btn" onClick={handleAddBook}>
-          <i className="ti ti-book-plus" /> 新增書本
-        </button>
       </aside>
 
       {/* Main content */}
@@ -2615,19 +2775,14 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
             books={books} records={records} navigate={desktopNavigate}
             addRecord={addRecord} addBook={addBook} deleteBook={deleteBook}
             exportData={exportData} importData={importData} toast={toast}
-            addBookTrigger={addBookTrigger} hideAddBtn={true}
+            hideAddBtn={true} hideImportExport={true}
             editTrigger={editTrigger}
           />
         )}
-        {dsktView === 'records' && (
-          <RecordsDashboard books={books} records={records} navigate={desktopNavigate} />
-        )}
-        {dsktView === 'add' && (
-          <AddRecord
-            key={addRecordKey}
-            books={books} addRecord={addRecord} addBook={addBook}
-            navigate={desktopNavigate} toast={toast}
-            initialBookId={addRecordInitialBookId}
+        {dsktView === 'addbook' && (
+          <DesktopAddBookPage
+            books={books} addBook={addBook}
+            exportData={exportData} importData={importData} toast={toast}
           />
         )}
         {dsktView === 'detail' && (() => {
