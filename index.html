@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-<title>樂樂英文有聲書共讀紀錄</title>
+<title>Kimi 英文共讀紀錄</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" />
 <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js" crossorigin></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js" crossorigin></script>
@@ -523,6 +523,46 @@
     }
     .d-panel .page { max-width: none; padding-bottom: 16px; }
     .d-panel .page-header { display: none; }
+
+    /* Hide FAB in desktop */
+    .d-layout .fab-fixed { display: none; }
+
+    /* Records Dashboard */
+    .d-records-page { padding: 24px 28px 48px; }
+    .d-rec-section-title { font-size: 11px; font-weight: 700; color: var(--text-sub); letter-spacing: 0.08em; text-transform: uppercase; margin: 24px 0 12px; }
+    .d-rec-section-title:first-child { margin-top: 0; }
+    .d-snapshot-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .d-snapshot-box { background: var(--card); border: 0.5px solid var(--card-border); border-radius: 12px; padding: 14px 18px; flex: 1; min-width: 90px; }
+    .d-snapshot-num { font-size: 28px; font-weight: 800; color: var(--primary); line-height: 1.1; }
+    .d-snapshot-lbl { font-size: 11px; color: var(--text-sub); margin-top: 4px; }
+    .d-cal-wrap { background: var(--card); border: 0.5px solid var(--card-border); border-radius: 12px; padding: 16px 20px; }
+    .d-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; max-width: 360px; }
+    .d-cal-wday { text-align: center; font-size: 10px; font-weight: 700; color: var(--text-light); padding: 4px 0; }
+    .d-cal-day { text-align: center; font-size: 13px; padding: 6px 4px; border-radius: 8px; color: var(--text-sub); }
+    .d-cal-day.read { background: #F0C9A0; color: var(--primary-dark); font-weight: 700; }
+    .d-cal-day.today { outline: 1.5px solid var(--primary); outline-offset: -1px; }
+    .d-cal-day.empty { visibility: hidden; }
+    .d-timeline-list { display: flex; flex-direction: column; background: var(--card); border: 0.5px solid var(--card-border); border-radius: 12px; overflow: hidden; }
+    .d-tl-entry { display: flex; align-items: flex-start; gap: 12px; padding: 10px 16px; border-bottom: 0.5px solid var(--card-border); cursor: pointer; transition: background 0.1s; }
+    .d-tl-entry:hover { background: #FDF5EC; }
+    .d-tl-entry:last-child { border-bottom: none; }
+    .d-tl-date { font-size: 12px; color: var(--text-sub); font-weight: 600; width: 38px; flex-shrink: 0; padding-top: 2px; }
+    .d-tl-dot { width: 8px; height: 8px; border-radius: 50%; background: #F0C9A0; border: 2px solid var(--primary); flex-shrink: 0; margin-top: 5px; }
+    .d-tl-content { flex: 1; min-width: 0; }
+    .d-tl-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .d-tl-sub { font-size: 11px; color: var(--text-sub); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 10px; }
+    .d-fav-list { display: flex; flex-direction: column; background: var(--card); border: 0.5px solid var(--card-border); border-radius: 12px; overflow: hidden; }
+    .d-fav-row { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 0.5px solid var(--card-border); cursor: pointer; transition: background 0.1s; }
+    .d-fav-row:hover { background: #FDF5EC; }
+    .d-fav-row:last-child { border-bottom: none; }
+    .d-fav-rank { font-size: 12px; font-weight: 700; color: var(--text-light); width: 18px; flex-shrink: 0; text-align: right; }
+    .d-fav-spine { width: 5px; height: 36px; border-radius: 2px; flex-shrink: 0; }
+    .d-fav-info { flex: 1; min-width: 0; }
+    .d-fav-title { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .d-fav-series { font-size: 11px; color: var(--text-light); margin-top: 1px; }
+    .d-fav-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+    .d-fav-love { font-size: 13px; }
+    .d-fav-count { font-size: 11px; color: var(--text-light); }
   }
 </style>
 </head>
@@ -675,7 +715,7 @@ function QuickLogModal({ books, addRecord, toast, initialBookId, onClose }) {
               </div>
             </div>
             <div className="form-group">
-              <label className="form-label">樂樂的反應</label>
+              <label className="form-label">Kimi 的反應</label>
               <div className="reaction-grid">
                 {REACTION_OPTIONS.map(r => (
                   <button key={r.value} className={'reaction-btn' + (reaction === r.value ? ' sel' : '')} onClick={() => setReaction(r.value)} style={{ fontSize:12, padding:'8px 6px' }}>
@@ -687,7 +727,7 @@ function QuickLogModal({ books, addRecord, toast, initialBookId, onClose }) {
             <div className="form-group">
               <div className="toggle-row">
                 <span className="toggle-label" style={{ fontSize:13 }}>
-                  <i className="ti ti-microphone" style={{ marginRight:6, color:'var(--primary)' }} />樂樂有跟著唸/唱
+                  <i className="ti ti-microphone" style={{ marginRight:6, color:'var(--primary)' }} />Kimi 有跟著唸/唱
                 </span>
                 <button className={'toggle' + (followed ? ' on' : '')} onClick={() => setFollowed(!followed)} />
               </div>
@@ -1193,7 +1233,7 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
     <div className="page">
       {/* Hero */}
       <div className="hero">
-        <div className="hero-title">📖 樂樂的英文共讀</div>
+        <div className="hero-title">📖 Kimi 的英文共讀</div>
         <div className="hero-sub">每一天的聆聽，都是成長的足跡</div>
         <div className="hero-stats">
           <div className="stat-pill"><i className="ti ti-calendar-heart" />{totalDays}<span>共讀天數</span></div>
@@ -1518,7 +1558,7 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
           </div>
 
           <div className="card">
-            <div className="card-title"><i className="ti ti-mood-smile" />樂樂的反應</div>
+            <div className="card-title"><i className="ti ti-mood-smile" />Kimi 的反應</div>
             <div className="reaction-grid">
               {REACTION_OPTIONS.map(r => (
                 <button key={r.value} className={'reaction-btn' + (reaction === r.value ? ' sel' : '')} onClick={() => setReaction(r.value)}>
@@ -1532,7 +1572,7 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
             <div className="toggle-row">
               <span className="toggle-label">
                 <i className="ti ti-microphone" style={{ marginRight: 6, color: 'var(--primary)' }} />
-                樂樂有跟著唸/唱
+                Kimi 有跟著唸/唱
               </span>
               <button className={'toggle' + (followed ? ' on' : '')} onClick={() => setFollowed(!followed)} />
             </div>
@@ -2017,7 +2057,7 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
           </div>
           {editBook && (
             <div className="form-group">
-              <label className="form-label">樂樂喜愛度</label>
+              <label className="form-label">Kimi 喜愛度</label>
               <StarRating value={newRating} onChange={setNewRating} />
             </div>
           )}
@@ -2073,31 +2113,21 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
 }
 
 /* ═══════════════════════════════════════
-   DesktopLayout
+   RecordsDashboard
 ═══════════════════════════════════════ */
-function DesktopLayout({ books, records, page, navigate, addRecord, addBook, deleteBook, exportData, importData, toast }) {
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [panelBookId, setPanelBookId] = useState('');
-  const [panelMode, setPanelMode] = useState('add'); // 'add' | 'detail'
-  const [detailBookId, setDetailBookId] = useState('');
+function RecordsDashboard({ books, records, navigate }) {
+  const thisMonthPrefix = useMemo(() => today().slice(0, 7), []);
 
-  const openPanel = useCallback((bookId) => {
-    setPanelBookId(bookId || '');
-    setPanelMode('add');
-    setPanelOpen(true);
-  }, []);
-  const openDetailPanel = useCallback((bookId) => {
-    setDetailBookId(bookId || '');
-    setPanelMode('detail');
-    setPanelOpen(true);
-  }, []);
-  const closePanel = useCallback(() => setPanelOpen(false), []);
-
+  const monthRecords = useMemo(() =>
+    records.filter(r => r.date && r.date.startsWith(thisMonthPrefix)),
+    [records, thisMonthPrefix]
+  );
+  const monthDays = useMemo(() => new Set(monthRecords.map(r => r.date)).size, [monthRecords]);
+  const monthBooks = useMemo(() => new Set(monthRecords.map(r => r.bookId)).size, [monthRecords]);
   const totalDays = useMemo(() => new Set(records.map(r => r.date)).size, [records]);
-  const totalSessions = records.length;
 
   const streak = useMemo(() => {
-    if (records.length === 0) return 0;
+    if (!records.length) return 0;
     const readDates = new Set(records.map(r => r.date));
     let count = 0;
     const d = new Date();
@@ -2109,123 +2139,243 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
     return count;
   }, [records]);
 
-  const thisMonth = useMemo(() => {
-    const prefix = today().slice(0, 7);
-    return records.filter(r => r.date && r.date.startsWith(prefix)).length;
-  }, [records]);
+  const calDays = useMemo(() => {
+    const [y, m] = thisMonthPrefix.split('-').map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const firstDayOfWeek = new Date(y, m - 1, 1).getDay();
+    const readDates = new Set(monthRecords.map(r => r.date));
+    const todayStr = today();
+    const days = [];
+    for (let i = 0; i < firstDayOfWeek; i++) days.push({ day: null });
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = thisMonthPrefix + '-' + String(d).padStart(2, '0');
+      days.push({ day: d, date: ds, hasRecord: readDates.has(ds), isToday: ds === todayStr });
+    }
+    return days;
+  }, [records, thisMonthPrefix, monthRecords]);
 
-  const [addBookTrigger, setAddBookTrigger] = useState(0);
+  const recentRecords = useMemo(() => {
+    const bookMap = Object.fromEntries(books.map(b => [b.id, b]));
+    return [...records]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 24)
+      .map(r => ({ ...r, book: bookMap[r.bookId] }));
+  }, [records, books]);
+
+  const kimiFavs = useMemo(() => {
+    const loveCount = {};
+    const totalCount = {};
+    records.forEach(r => {
+      totalCount[r.bookId] = (totalCount[r.bookId] || 0) + 1;
+      if (r.leloReaction === 'love') loveCount[r.bookId] = (loveCount[r.bookId] || 0) + 1;
+    });
+    return books
+      .filter(b => totalCount[b.id] > 0)
+      .map(b => ({ ...b, loves: loveCount[b.id] || 0, total: totalCount[b.id] || 0 }))
+      .sort((a, b) => b.loves - a.loves || b.total - a.total)
+      .slice(0, 8);
+  }, [books, records]);
+
+  const REACTION_ICONS = { love: '❤️', like: '👍', ok: '😐', skip: '😔' };
+  const [y, m] = thisMonthPrefix.split('-').map(Number);
+  const monthLabel = y + '年 ' + m + '月';
+  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+
+  return (
+    <div className="d-records-page">
+      {/* Overall snapshot */}
+      <div className="d-rec-section-title">整體概況</div>
+      <div className="d-snapshot-row">
+        <div className="d-snapshot-box">
+          <div className="d-snapshot-num">{totalDays}</div>
+          <div className="d-snapshot-lbl">累計共讀天</div>
+        </div>
+        <div className="d-snapshot-box">
+          <div className="d-snapshot-num">{records.length}</div>
+          <div className="d-snapshot-lbl">累計次數</div>
+        </div>
+        <div className="d-snapshot-box">
+          <div className="d-snapshot-num">{books.length}</div>
+          <div className="d-snapshot-lbl">本書</div>
+        </div>
+        {streak > 0 && (
+          <div className="d-snapshot-box" style={{ borderColor: '#E87840' }}>
+            <div className="d-snapshot-num" style={{ color: '#E87840' }}>{streak} 🔥</div>
+            <div className="d-snapshot-lbl">連續天數</div>
+          </div>
+        )}
+      </div>
+
+      {/* Monthly calendar */}
+      <div className="d-rec-section-title">{monthLabel} 打卡</div>
+      <div className="d-cal-wrap">
+        <div className="d-cal-grid">
+          {weekDays.map(w => (
+            <div key={w} className="d-cal-wday">{w}</div>
+          ))}
+          {calDays.map((cell, i) => (
+            <div key={i} className={'d-cal-day' + (cell.hasRecord ? ' read' : '') + (cell.isToday ? ' today' : '') + (!cell.day ? ' empty' : '')}>
+              {cell.day}
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-sub)', marginTop: 12 }}>
+          本月已讀 <b style={{ color: 'var(--primary)' }}>{monthDays}</b> 天・
+          共 <b style={{ color: 'var(--primary)' }}>{monthRecords.length}</b> 次・
+          <b style={{ color: 'var(--primary)' }}>{monthBooks}</b> 本書
+        </div>
+      </div>
+
+      {/* Recent timeline */}
+      <div className="d-rec-section-title">最近共讀</div>
+      {recentRecords.length === 0 ? (
+        <div className="empty-state"><i className="ti ti-calendar-off" /><p>還沒有共讀紀錄</p></div>
+      ) : (
+        <div className="d-timeline-list">
+          {recentRecords.map(r => (
+            <div key={r.id} className="d-tl-entry" onClick={() => navigate('detail', { bookId: r.bookId })}>
+              <div className="d-tl-date">{r.date.slice(5).replace('-', '/')}</div>
+              <div className="d-tl-dot" />
+              <div className="d-tl-content">
+                <div className="d-tl-title">
+                  {r.book?.title || r.bookTitle}
+                  {r.leloReaction && <span style={{ marginLeft: 6 }}>{REACTION_ICONS[r.leloReaction]}</span>}
+                  {r.leloFollowed && <span style={{ marginLeft: 4, fontSize: 11 }}>🎙</span>}
+                </div>
+                {(r.duration || r.leloSentences || r.momNotes) && (
+                  <div className="d-tl-sub">
+                    {r.duration && <span>⏱ {r.duration}</span>}
+                    {r.leloSentences && <span>💬 「{r.leloSentences}」</span>}
+                    {r.momNotes && <span>{r.momNotes}</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Kimi's favorites */}
+      <div className="d-rec-section-title">Kimi 最愛 ❤️</div>
+      {kimiFavs.length === 0 ? (
+        <div style={{ padding: '16px 0', color: 'var(--text-sub)', fontSize: 13 }}>
+          還沒有帶有愛心反應的紀錄
+        </div>
+      ) : (
+        <div className="d-fav-list">
+          {kimiFavs.map((b, i) => (
+            <div key={b.id} className="d-fav-row" onClick={() => navigate('detail', { bookId: b.id })}>
+              <div className="d-fav-rank">{i + 1}</div>
+              <div className="d-fav-spine" style={{ background: getSpineColor(b.id) }} />
+              <div className="d-fav-info">
+                <div className="d-fav-title">{b.title}</div>
+                {b.series && <div className="d-fav-series">{b.series}</div>}
+              </div>
+              <div className="d-fav-right">
+                {b.loves > 0 && <span className="d-fav-love">{'❤️'.repeat(Math.min(b.loves, 5))}{b.loves > 5 ? ' ×' + b.loves : ''}</span>}
+                <span className="d-fav-count"><i className="ti ti-headphones" /> {b.total}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   DesktopLayout
+═══════════════════════════════════════ */
+function DesktopLayout({ books, records, page, navigate, addRecord, addBook, deleteBook, exportData, importData, toast }) {
+  const [dsktView, setDsktView] = useState('books'); // 'books' | 'records' | 'add' | 'detail'
+  const [dsktDetailBookId, setDsktDetailBookId] = useState('');
   const [editTrigger, setEditTrigger] = useState({ n: 0, bookId: null });
+  const [addBookTrigger, setAddBookTrigger] = useState(0);
+  const [addRecordKey, setAddRecordKey] = useState(0);
+  const [addRecordInitialBookId, setAddRecordInitialBookId] = useState('');
 
-  const panelNavigate = useCallback(() => closePanel(), [closePanel]);
   const desktopNavigate = useCallback((p, params) => {
-    if (p === 'add') { openPanel(params?.bookId || ''); }
-    else if (p === 'detail') { openDetailPanel(params?.bookId || ''); }
-    else { navigate(p); }
-  }, [navigate, openPanel, openDetailPanel]);
+    if (p === 'add') {
+      setAddRecordInitialBookId(params?.bookId || '');
+      setAddRecordKey(k => k + 1);
+      setDsktView('add');
+    } else if (p === 'detail') {
+      setDsktDetailBookId(params?.bookId || '');
+      setDsktView('detail');
+    } else {
+      setDsktView('books');
+    }
+  }, []);
+
+  const handleNewRecord = useCallback(() => {
+    setAddRecordInitialBookId('');
+    setAddRecordKey(k => k + 1);
+    setDsktView('add');
+  }, []);
+
+  const handleAddBook = useCallback(() => {
+    setDsktView('books');
+    setAddBookTrigger(n => n + 1);
+  }, []);
 
   return (
     <div className="d-layout">
       {/* Sidebar */}
       <aside className="d-sidebar">
         <div className="d-logo">
-          <div className="d-logo-title">📖 樂樂共讀</div>
+          <div className="d-logo-title">📖 Kimi 共讀</div>
           <div className="d-logo-sub">英文有聲書紀錄</div>
         </div>
         <nav className="d-nav">
-          <button className={'d-nav-btn' + (page === 'home' ? ' on' : '')} onClick={() => navigate('home')}>
-            <i className="ti ti-home" /> 首頁
+          <button className={'d-nav-btn' + ((dsktView === 'books' || dsktView === 'detail') ? ' on' : '')} onClick={() => setDsktView('books')}>
+            <i className="ti ti-books" /> 書單
+          </button>
+          <button className={'d-nav-btn' + (dsktView === 'records' ? ' on' : '')} onClick={() => setDsktView('records')}>
+            <i className="ti ti-chart-bar" /> 共讀紀錄
+          </button>
+          <button className={'d-nav-btn' + (dsktView === 'add' ? ' on' : '')} onClick={handleNewRecord}>
+            <i className="ti ti-plus" /> 新增記錄
           </button>
         </nav>
-        <div className="d-stats-box">
-          <div className="d-stats-lbl">累計統計</div>
-          <div className="d-stat-row">
-            <span className="d-stat-label"><i className="ti ti-calendar-heart" />共讀天數</span>
-            <span className="d-stat-val">{totalDays}</span>
-          </div>
-          <div className="d-stat-row">
-            <span className="d-stat-label"><i className="ti ti-books" />本書</span>
-            <span className="d-stat-val">{books.length}</span>
-          </div>
-          <div className="d-stat-row">
-            <span className="d-stat-label"><i className="ti ti-headphones" />共讀次數</span>
-            <span className="d-stat-val">{totalSessions}</span>
-          </div>
-          {streak > 0 && (
-            <div className="d-stat-row">
-              <span className="d-stat-label"><i className="ti ti-flame" style={{ color: '#E87840' }} />連續天數</span>
-              <span className="d-stat-val" style={{ color: '#E87840' }}>{streak} 🔥</span>
-            </div>
-          )}
-          <div className="d-stat-row">
-            <span className="d-stat-label"><i className="ti ti-calendar-month" />本月次數</span>
-            <span className="d-stat-val">{thisMonth}</span>
-          </div>
-        </div>
-        <button className="d-add-btn" onClick={() => openPanel('')}>
-          <i className="ti ti-plus" /> 記錄今天
-        </button>
-        <button className="d-add-btn" style={{ marginTop:8, background:'var(--bg)', color:'var(--primary-dark)', border:'1.5px solid var(--primary)', boxShadow:'none' }} onClick={() => setAddBookTrigger(n => n + 1)}>
+        <button className="d-add-btn" onClick={handleAddBook}>
           <i className="ti ti-book-plus" /> 新增書本
         </button>
       </aside>
 
       {/* Main content */}
       <main className="d-main">
-        <Dashboard
-          books={books} records={records} navigate={desktopNavigate}
-          addRecord={addRecord}
-          addBook={addBook} deleteBook={deleteBook}
-          exportData={exportData} importData={importData} toast={toast}
-          addBookTrigger={addBookTrigger} hideAddBtn={true}
-          editTrigger={editTrigger}
-        />
+        {dsktView === 'books' && (
+          <Dashboard
+            books={books} records={records} navigate={desktopNavigate}
+            addRecord={addRecord} addBook={addBook} deleteBook={deleteBook}
+            exportData={exportData} importData={importData} toast={toast}
+            addBookTrigger={addBookTrigger} hideAddBtn={true}
+            editTrigger={editTrigger}
+          />
+        )}
+        {dsktView === 'records' && (
+          <RecordsDashboard books={books} records={records} navigate={desktopNavigate} />
+        )}
+        {dsktView === 'add' && (
+          <AddRecord
+            key={addRecordKey}
+            books={books} addRecord={addRecord} addBook={addBook}
+            navigate={desktopNavigate} toast={toast}
+            initialBookId={addRecordInitialBookId}
+          />
+        )}
+        {dsktView === 'detail' && (() => {
+          const detailBook = books.find(b => b.id === dsktDetailBookId);
+          return detailBook ? (
+            <BookDetail
+              book={detailBook} books={books} records={records}
+              addRecord={addRecord} toast={toast}
+              onBack={() => setDsktView('books')}
+              onEdit={(b) => { setEditTrigger(prev => ({ n: prev.n + 1, bookId: b.id })); setDsktView('books'); }}
+            />
+          ) : <div style={{ padding: 40, color: 'var(--text-sub)' }}>找不到書本</div>;
+        })()}
       </main>
-
-      {/* Slide panel */}
-      {panelOpen && (
-        <div className="d-overlay" onClick={closePanel}>
-          <div className="d-panel" onClick={e => e.stopPropagation()}>
-            {panelMode === 'detail' ? (() => {
-              const detailBook = books.find(b => b.id === detailBookId);
-              return (
-                <>
-                  <div className="d-panel-hdr">
-                    <div className="d-panel-title"><i className="ti ti-book-2" />共讀紀錄</div>
-                    <button className="d-close-btn" onClick={closePanel}><i className="ti ti-x" /></button>
-                  </div>
-                  {detailBook ? (
-                    <BookDetail
-                      book={detailBook}
-                      books={books}
-                      records={records}
-                      addRecord={addRecord}
-                      toast={toast}
-                      onBack={closePanel}
-                      onEdit={(b) => { setEditTrigger(prev => ({ n: prev.n + 1, bookId: b.id })); closePanel(); }}
-                    />
-                  ) : null}
-                </>
-              );
-            })() : (
-              <>
-                <div className="d-panel-hdr">
-                  <div className="d-panel-title"><i className="ti ti-pencil" />記錄共讀</div>
-                  <button className="d-close-btn" onClick={closePanel}><i className="ti ti-x" /></button>
-                </div>
-                <AddRecord
-                  books={books}
-                  addRecord={addRecord}
-                  addBook={addBook}
-                  navigate={panelNavigate}
-                  toast={toast}
-                  initialBookId={panelBookId}
-                />
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
