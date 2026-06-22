@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <title>Kimi 英文共讀紀錄</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js" crossorigin></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js" crossorigin></script>
 <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.10/babel.min.js"></script>
@@ -570,6 +571,37 @@
 <div id="root"></div>
 <script type="text/babel">
 const { useState, useEffect, useMemo, useCallback } = React;
+
+/* ── Supabase ── */
+const db = window.supabase.createClient(
+  'https://qvknxuakaiboqrrfbtfa.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2a254dWFrYWlib3FycmZidGZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTU3NDksImV4cCI6MjA5NzY3MTc0OX0.6rOFARrEuNZi6Kl5iOBMsHHl92R-fvuYvUd8mrLeV70'
+);
+
+const bookToDb = b => ({
+  id: b.id, title: b.title, author: b.author||'',
+  series: b.series||'', notes: b.notes||'', rating: b.rating||0,
+  status: b.status||'active', created_at: b.createdAt||''
+});
+const recordToDb = r => ({
+  id: r.id, book_id: r.bookId, book_title: r.bookTitle||'',
+  date: r.date||'', duration: r.duration||'',
+  lelo_reaction: r.leloReaction||'', lelo_followed: r.leloFollowed||false,
+  lelo_sentences: r.leloSentences||'', mom_notes: r.momNotes||'',
+  created_at: r.createdAt||''
+});
+const dbToBook = row => ({
+  id: row.id, title: row.title, author: row.author||'',
+  series: row.series||'', notes: row.notes||'', rating: row.rating||0,
+  status: row.status||'active', createdAt: row.created_at||''
+});
+const dbToRecord = row => ({
+  id: row.id, bookId: row.book_id, bookTitle: row.book_title||'',
+  date: row.date||'', duration: row.duration||'',
+  leloReaction: row.lelo_reaction||'', leloFollowed: row.lelo_followed||false,
+  leloSentences: row.lelo_sentences||'', momNotes: row.mom_notes||'',
+  createdAt: row.created_at||''
+});
 
 /* ── Constants ── */
 const SPINE_COLORS = ['#E8A855','#E89880','#90C8A0','#8BBCE0','#E0A0B8','#B8A8E0','#E8C878','#A8C890','#D4A8D0','#9ABCD8'];
@@ -2400,26 +2432,16 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
    App (root)
 ═══════════════════════════════════════ */
 function App() {
-  const [books, setBooks] = useState(() => {
-    try {
-      const s = localStorage.getItem('lele_books_v2');
-      const parsed = s ? JSON.parse(s) : SAMPLE_BOOKS;
-      // migrate: graduated:boolean → status string
-      return parsed.map(b => b.status ? b : { ...b, status: b.graduated ? 'graduated' : 'active' });
-    } catch { return SAMPLE_BOOKS; }
-  });
-  const [records, setRecords] = useState(() => {
-    try {
-      const s = localStorage.getItem('lele_records_v2');
-      return s ? JSON.parse(s) : SAMPLE_RECORDS;
-    } catch { return SAMPLE_RECORDS; }
-  });
+  const [books, setBooks] = useState([]);
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState('home');
   const [navParam, setNavParam] = useState({});
   const [editTrigger, setEditTrigger] = useState({ n: 0, bookId: null });
   const [toastMsg, setToastMsg] = useState('');
   const [toastKey, setToastKey] = useState(0);
   const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 900px)').matches);
+
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 900px)');
     const handler = e => setIsDesktop(e.matches);
@@ -2427,35 +2449,96 @@ function App() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  useEffect(() => { localStorage.setItem('lele_books_v2', JSON.stringify(books)); }, [books]);
-  useEffect(() => { localStorage.setItem('lele_records_v2', JSON.stringify(records)); }, [records]);
+  /* ── 載入資料 + real-time 訂閱 ── */
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadData() {
+      const [{ data: booksData, error: bErr }, { data: recsData, error: rErr }] = await Promise.all([
+        db.from('books').select('*').order('created_at'),
+        db.from('records').select('*').order('date', { ascending: false })
+      ]);
+      if (!mounted) return;
+      if (bErr || rErr) { console.error(bErr || rErr); setLoading(false); return; }
+
+      let loadedBooks = (booksData || []).map(dbToBook);
+      let loadedRecords = (recsData || []).map(dbToRecord);
+
+      // 一次性從 localStorage 遷移舊資料
+      if (loadedBooks.length === 0) {
+        try {
+          const localBooks = JSON.parse(localStorage.getItem('lele_books_v2') || '[]');
+          const localRecs  = JSON.parse(localStorage.getItem('lele_records_v2') || '[]');
+          if (localBooks.length > 0) {
+            const fixedBooks = localBooks.map(b => b.status ? b : { ...b, status: b.graduated ? 'graduated' : 'active' });
+            await db.from('books').insert(fixedBooks.map(bookToDb));
+            if (localRecs.length > 0) await db.from('records').insert(localRecs.map(recordToDb));
+            localStorage.removeItem('lele_books_v2');
+            localStorage.removeItem('lele_records_v2');
+            loadedBooks = fixedBooks;
+            loadedRecords = localRecs;
+          }
+        } catch(e) { console.error('Migration error', e); }
+      }
+
+      if (mounted) { setBooks(loadedBooks); setRecords(loadedRecords); setLoading(false); }
+    }
+
+    loadData();
+
+    // Real-time 跨裝置同步
+    const channel = db.channel('app-sync')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'books' }, ({ new: row }) => {
+        setBooks(prev => prev.some(b => b.id === row.id) ? prev : [...prev, dbToBook(row)]);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'books' }, ({ new: row }) => {
+        setBooks(prev => prev.map(b => b.id === row.id ? dbToBook(row) : b));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'books' }, ({ old: row }) => {
+        setBooks(prev => prev.filter(b => b.id !== row.id));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'records' }, ({ new: row }) => {
+        setRecords(prev => prev.some(r => r.id === row.id) ? prev : [dbToRecord(row), ...prev]);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'records' }, ({ new: row }) => {
+        setRecords(prev => prev.map(r => r.id === row.id ? dbToRecord(row) : r));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'records' }, ({ old: row }) => {
+        setRecords(prev => prev.filter(r => r.id !== row.id));
+      })
+      .subscribe();
+
+    return () => { mounted = false; db.removeChannel(channel); };
+  }, []);
 
   const navigate = useCallback((p, params) => {
-    setPage(p);
-    setNavParam(params || {});
-    window.scrollTo(0, 0);
+    setPage(p); setNavParam(params || {}); window.scrollTo(0, 0);
   }, []);
 
   const toast = useCallback((msg) => {
-    setToastMsg(msg);
-    setToastKey(k => k + 1);
+    setToastMsg(msg); setToastKey(k => k + 1);
     setTimeout(() => setToastMsg(''), 2200);
   }, []);
 
-  const addRecord = useCallback((rec) => {
-    setRecords(prev => [rec, ...prev]);
-  }, []);
+  const addRecord = useCallback(async (rec) => {
+    setRecords(prev => [rec, ...prev]); // 樂觀更新
+    const { error } = await db.from('records').insert(recordToDb(rec));
+    if (error) { console.error(error); toast('儲存失敗，請重試'); }
+  }, [toast]);
 
-  const deleteBook = useCallback((bookId) => {
+  const deleteBook = useCallback(async (bookId) => {
     setBooks(prev => prev.filter(b => b.id !== bookId));
     setRecords(prev => prev.filter(r => r.bookId !== bookId));
+    await db.from('books').delete().eq('id', bookId); // cascade deletes records
   }, []);
 
-  const addBook = useCallback((book, isUpdate) => {
+  const addBook = useCallback(async (book, isUpdate) => {
     if (isUpdate) {
       setBooks(prev => prev.map(b => b.id === book.id ? book : b));
+      await db.from('books').update(bookToDb(book)).eq('id', book.id);
     } else {
       setBooks(prev => [...prev, book]);
+      await db.from('books').insert(bookToDb(book));
     }
   }, []);
 
@@ -2468,36 +2551,53 @@ function App() {
       const b = bookMap[r.bookId] || {};
       coveredBookIds.add(r.bookId);
       rows.push([
-        b.title || r.bookTitle, b.author||'', b.series||'', b.notes||'', b.rating||0, b.status === 'graduated' ? '已畢業' : b.status === 'wantToRead' ? '待讀' : '進行中',
+        b.title || r.bookTitle, b.author||'', b.series||'', b.notes||'', b.rating||0,
+        b.status === 'graduated' ? '已畢業' : b.status === 'wantToRead' ? '待讀' : '進行中',
         r.date, r.duration, r.leloReaction||'', r.leloFollowed ? '是' : '否', r.leloSentences||'', r.momNotes||''
       ]);
     });
     books.filter(b => !coveredBookIds.has(b.id)).forEach(b => {
-      rows.push([b.title, b.author||'', b.series||'', b.notes||'', b.rating||0, b.status === 'graduated' ? '已畢業' : b.status === 'wantToRead' ? '待讀' : '進行中', '','','','','','']);
+      rows.push([b.title, b.author||'', b.series||'', b.notes||'', b.rating||0,
+        b.status === 'graduated' ? '已畢業' : b.status === 'wantToRead' ? '待讀' : '進行中',
+        '','','','','','']);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), '共讀紀錄');
-    XLSX.writeFile(wb, 'lele-reading-' + today() + '.xlsx');
+    XLSX.writeFile(wb, 'kimi-reading-' + today() + '.xlsx');
   }, [books, records]);
 
-  const importData = useCallback((data, mode) => {
+  const importData = useCallback(async (data, mode) => {
     const incoming = {
       books: Array.isArray(data.books) ? data.books : [],
       records: Array.isArray(data.records) ? data.records : [],
     };
     if (mode === 'replace') {
-      setBooks(incoming.books);
-      setRecords(incoming.records);
-    } else {
-      setBooks(prev => {
-        const ids = new Set(prev.map(b => b.id));
-        return [...prev, ...incoming.books.filter(b => !ids.has(b.id))];
-      });
-      setRecords(prev => {
-        const ids = new Set(prev.map(r => r.id));
-        return [...prev, ...incoming.records.filter(r => !ids.has(r.id))];
-      });
+      await db.from('books').delete().not('id', 'is', null); // cascade deletes records
     }
-  }, []);
+    const booksToInsert = mode === 'merge'
+      ? incoming.books.filter(b => !books.some(x => x.id === b.id))
+      : incoming.books;
+    const recsToInsert = mode === 'merge'
+      ? incoming.records.filter(r => !records.some(x => x.id === r.id))
+      : incoming.records;
+    if (booksToInsert.length) await db.from('books').insert(booksToInsert.map(bookToDb));
+    if (recsToInsert.length) await db.from('records').insert(recsToInsert.map(recordToDb));
+    // 重新載入確保一致
+    const [{ data: b }, { data: r }] = await Promise.all([
+      db.from('books').select('*').order('created_at'),
+      db.from('records').select('*').order('date', { ascending: false })
+    ]);
+    setBooks((b||[]).map(dbToBook));
+    setRecords((r||[]).map(dbToRecord));
+  }, [books, records]);
+
+  if (loading) {
+    return (
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', flexDirection:'column', gap:16, color:'var(--text-sub)', fontFamily:'var(--font-round)' }}>
+        <i className="ti ti-book-2" style={{ fontSize:52, color:'var(--primary)' }} />
+        <div style={{ fontSize:14 }}>載入共讀紀錄中...</div>
+      </div>
+    );
+  }
 
   const sharedProps = { books, records, addRecord, addBook, deleteBook, exportData, importData, toast, navigate, page };
 
@@ -2510,31 +2610,20 @@ function App() {
           {page === 'home' && (
             <Dashboard
               books={books} records={records} navigate={navigate}
-              addRecord={addRecord}
-              addBook={addBook} deleteBook={deleteBook}
+              addRecord={addRecord} addBook={addBook} deleteBook={deleteBook}
               exportData={exportData} importData={importData} toast={toast}
               editTrigger={editTrigger}
             />
           )}
           {page === 'add' && (
-            <AddRecord
-              books={books}
-              addRecord={addRecord}
-              addBook={addBook}
-              navigate={navigate}
-              toast={toast}
-              initialBookId={navParam.bookId || ''}
-            />
+            <AddRecord books={books} addRecord={addRecord} addBook={addBook}
+              navigate={navigate} toast={toast} initialBookId={navParam.bookId || ''} />
           )}
           {page === 'detail' && (() => {
             const detailBook = books.find(b => b.id === navParam.bookId);
             return detailBook ? (
-              <BookDetail
-                book={detailBook}
-                books={books}
-                records={records}
-                addRecord={addRecord}
-                toast={toast}
+              <BookDetail book={detailBook} books={books} records={records}
+                addRecord={addRecord} toast={toast}
                 onBack={() => navigate('home')}
                 onEdit={(b) => { setEditTrigger(prev => ({ n: prev.n + 1, bookId: b.id })); navigate('home'); }}
               />
