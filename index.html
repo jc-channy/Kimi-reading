@@ -372,6 +372,37 @@
   }
   @keyframes qlFadeScale { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
 
+  /* ── Status quick-change sheet (long press B) ── */
+  .sqs-overlay { position: fixed; inset: 0; background: rgba(58,40,16,0.38); z-index: 300; display: flex; align-items: flex-end; }
+  .sqs-sheet { background: var(--card); border-radius: 24px 24px 0 0; width: 100%; padding: 16px 16px 48px; animation: qlSlideUp 0.2s ease; }
+  .sqs-handle { width: 36px; height: 4px; background: #DDD0C0; border-radius: 2px; margin: 0 auto 12px; }
+  .sqs-book { font-size: 14px; font-weight: 700; color: var(--text); text-align: center; margin-bottom: 16px; padding: 0 8px; line-height: 1.4; }
+  .sqs-opt { width: 100%; padding: 13px 16px; display: flex; align-items: center; gap: 12px; background: var(--bg); border: 1.5px solid var(--card-border); border-radius: 12px; font-size: 15px; font-family: var(--font-round); cursor: pointer; color: var(--text); margin-bottom: 8px; transition: all 0.12s; }
+  .sqs-opt.on { background: #F5E8DA; border-color: var(--primary); color: var(--primary-dark); font-weight: 700; }
+  .sqs-cancel { width: 100%; padding: 12px; margin-top: 4px; background: none; border: none; border-radius: 12px; font-size: 15px; color: var(--text-light); font-family: var(--font-round); cursor: pointer; }
+
+  /* ── Batch mode (C) ── */
+  .batch-bar { position: fixed; bottom: calc(var(--nav-h) + 10px); left: 14px; right: 14px; background: #3A2810; color: #fff; border-radius: 16px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; z-index: 150; box-shadow: 0 4px 20px rgba(0,0,0,0.3); flex-wrap: wrap; }
+  .batch-cnt { font-size: 12px; color: rgba(255,255,255,0.7); flex-shrink: 0; }
+  .batch-st { padding: 6px 12px; border-radius: 10px; border: none; background: rgba(255,255,255,0.15); color: #fff; font-size: 12px; font-family: var(--font-round); cursor: pointer; flex-shrink: 0; transition: background 0.12s; }
+  .batch-st:active { background: rgba(255,255,255,0.3); }
+  .batch-cancel-btn { margin-left: auto; padding: 6px 10px; border-radius: 10px; border: none; background: none; color: rgba(255,255,255,0.55); font-size: 12px; font-family: var(--font-round); cursor: pointer; flex-shrink: 0; }
+  .lib-book-row.batch-sel { background: #FFF8F0 !important; }
+  .bcheck { width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--card-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--bg); transition: all 0.12s; }
+  .bcheck.on { background: var(--primary); border-color: var(--primary); }
+  .bcheck.on::after { content: '✓'; color: #fff; font-size: 13px; font-weight: 700; line-height: 1; }
+
+  /* ── Drag reorder ── */
+  .drag-handle { display: flex; align-items: center; padding: 0 6px 0 4px; color: #C0B098; cursor: grab; flex-shrink: 0; }
+  .drag-handle i { font-size: 18px; pointer-events: none; }
+  .lib-book-row.drag-over { border-top: 2px solid var(--primary); background: #FDF5EC; }
+
+  @media (min-width: 900px) {
+    .sqs-overlay { align-items: center; justify-content: center; }
+    .sqs-sheet { border-radius: 20px; max-width: 380px; padding: 20px 20px 24px; }
+    .batch-bar { bottom: 20px; left: 28px; right: 28px; }
+  }
+
   /* ── Book Detail ── */
   .bd-header {
     background: linear-gradient(160deg, var(--hero-a) 0%, var(--hero-b) 60%, var(--hero-c) 100%);
@@ -581,7 +612,8 @@ const db = window.supabase.createClient(
 const bookToDb = b => ({
   id: b.id, title: b.title, author: b.author||'',
   series: b.series||'', notes: b.notes||'', rating: b.rating||0,
-  status: b.status||'active', created_at: b.createdAt||''
+  status: b.status||'active', created_at: b.createdAt||'',
+  sort_order: b.sort_order ?? 0
 });
 const recordToDb = r => ({
   id: r.id, book_id: r.bookId, book_title: r.bookTitle||'',
@@ -593,7 +625,8 @@ const recordToDb = r => ({
 const dbToBook = row => ({
   id: row.id, title: row.title, author: row.author||'',
   series: row.series||'', notes: row.notes||'', rating: row.rating||0,
-  status: row.status||'active', createdAt: row.created_at||''
+  status: row.status||'active', createdAt: row.created_at||'',
+  sort_order: row.sort_order ?? 0
 });
 const dbToRecord = row => ({
   id: row.id, bookId: row.book_id, bookTitle: row.book_title||'',
@@ -968,6 +1001,14 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
   const [pendingImport, setPendingImport] = useState(null);
   const fileInputRef = React.useRef(null);
   const [quickLogBookId, setQuickLogBookId] = useState(null); // null=closed, string=open
+  const [searchQuery, setSearchQuery] = useState('');
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [actionSheetBook, setActionSheetBook] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+  const dragBookId = React.useRef(null);
+  const longPressTimer = React.useRef(null);
+  const longPressTriggered = React.useRef(false);
 
   const ROW_COL_MAP = {
     '書名': 'title', 'title': 'title',
@@ -1148,12 +1189,22 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
     return m;
   }, [records]);
 
+  const searchFiltered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return books;
+    return books.filter(b =>
+      b.title.toLowerCase().includes(q) ||
+      (b.author||'').toLowerCase().includes(q) ||
+      (b.series||'').toLowerCase().includes(q)
+    );
+  }, [books, searchQuery]);
+
   const tabFiltered = useMemo(() => {
-    if (filterTab === 'active') return books.filter(b => (b.status || 'active') === 'active');
-    if (filterTab === 'wantToRead') return books.filter(b => b.status === 'wantToRead');
-    if (filterTab === 'graduated') return books.filter(b => b.status === 'graduated');
-    return books;
-  }, [books, filterTab]);
+    if (filterTab === 'active') return searchFiltered.filter(b => (b.status || 'active') === 'active');
+    if (filterTab === 'wantToRead') return searchFiltered.filter(b => b.status === 'wantToRead');
+    if (filterTab === 'graduated') return searchFiltered.filter(b => b.status === 'graduated');
+    return searchFiltered;
+  }, [searchFiltered, filterTab]);
 
   const sortedBooks = useMemo(() => {
     const arr = [...tabFiltered];
@@ -1161,6 +1212,11 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
     else if (sortBy === 'newest') arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     else if (sortBy === 'az') arr.sort((a, b) => a.title.localeCompare(b.title, 'zh-TW'));
     else if (sortBy === 'count') arr.sort((a, b) => (readCountMap[b.id] || 0) - (readCountMap[a.id] || 0));
+    else if (sortBy === 'manual') arr.sort((a, b) => {
+      const ao = a.sort_order ?? 0, bo = b.sort_order ?? 0;
+      if (ao !== bo) return ao - bo;
+      return (a.createdAt||'').localeCompare(b.createdAt||'');
+    });
     return arr;
   }, [tabFiltered, sortBy, lastReadMap, readCountMap]);
 
@@ -1176,6 +1232,74 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
   }, [sortedBooks]);
 
   const toggleSeries = (name) => setOpenSeries(prev => ({ ...prev, [name]: !prev[name] }));
+
+  // ── Long press (Option B) ──
+  const handleLongPressStart = useCallback((b) => () => {
+    longPressTriggered.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true;
+      setActionSheetBook(b);
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 500);
+  }, []);
+  const handleLongPressEnd = useCallback(() => clearTimeout(longPressTimer.current), []);
+  const handleLongPressMove = useCallback(() => clearTimeout(longPressTimer.current), []);
+
+  const applyStatusChange = useCallback((newStatus) => {
+    if (!actionSheetBook) return;
+    addBook({ ...actionSheetBook, status: newStatus }, true);
+    setActionSheetBook(null);
+    toast('狀態已更新');
+  }, [actionSheetBook, addBook, toast]);
+
+  // ── Batch mode (Option C) ──
+  const toggleBatchSelect = useCallback((id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const applyBatchStatus = useCallback((newStatus) => {
+    let count = 0;
+    selectedIds.forEach(id => {
+      const b = books.find(x => x.id === id);
+      if (b) { addBook({ ...b, status: newStatus }, true); count++; }
+    });
+    toast(`已更新 ${count} 本書的狀態`);
+    setSelectedIds(new Set());
+    setBatchMode(false);
+  }, [selectedIds, books, addBook, toast]);
+
+  // ── Drag to reorder ──
+  const handleDragStart = useCallback((id) => (e) => {
+    dragBookId.current = id;
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+  const handleDragOver = useCallback((id) => (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverId(id);
+  }, []);
+  const handleDragEnd = useCallback(() => {
+    setDragOverId(null);
+    dragBookId.current = null;
+  }, []);
+  const handleDrop = useCallback((targetId, currentSorted) => async (e) => {
+    e.preventDefault();
+    const srcId = dragBookId.current;
+    setDragOverId(null);
+    dragBookId.current = null;
+    if (!srcId || srcId === targetId) return;
+    const arr = [...currentSorted];
+    const si = arr.findIndex(b => b.id === srcId);
+    const ti = arr.findIndex(b => b.id === targetId);
+    if (si < 0 || ti < 0) return;
+    const [moved] = arr.splice(si, 1);
+    arr.splice(ti, 0, moved);
+    arr.forEach((b, i) => { if ((b.sort_order ?? 0) !== i) addBook({ ...b, sort_order: i }, true); });
+  }, [addBook]);
 
   const monthlyData = useMemo(() => {
     const now = new Date();
@@ -1239,13 +1363,46 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
     </div>
   );
 
-  const BookRow = ({ b }) => {
+  const BookRow = ({ b, sortedForDrag }) => {
     const rc = readCountMap[b.id] || 0;
     const dates = recentDatesMap[b.id] || [];
     const isEditing = editBookId === b.id;
+    const isSelected = selectedIds.has(b.id);
+    const isDragOver = dragOverId === b.id;
+    const showDrag = sortBy === 'manual' && !batchMode;
+
+    const handleClick = () => {
+      if (batchMode) { toggleBatchSelect(b.id); return; }
+      if (longPressTriggered.current) { longPressTriggered.current = false; return; }
+      navigate('detail', { bookId: b.id });
+    };
+
     return (
       <>
-        <div className="lib-book-row" data-edit-id={b.id} onClick={() => navigate('detail', {bookId: b.id})} style={{ background: isEditing ? '#FFF8F0' : undefined }}>
+        <div
+          className={'lib-book-row' + (isSelected ? ' batch-sel' : '') + (isDragOver ? ' drag-over' : '')}
+          data-edit-id={b.id}
+          onClick={handleClick}
+          style={{ background: isEditing ? '#FFF8F0' : undefined, userSelect: 'none' }}
+          onTouchStart={!batchMode ? handleLongPressStart(b) : undefined}
+          onTouchEnd={handleLongPressEnd}
+          onTouchMove={handleLongPressMove}
+          draggable={showDrag}
+          onDragStart={showDrag ? handleDragStart(b.id) : undefined}
+          onDragOver={showDrag ? handleDragOver(b.id) : undefined}
+          onDrop={showDrag ? handleDrop(b.id, sortedForDrag || sortedBooks) : undefined}
+          onDragEnd={showDrag ? handleDragEnd : undefined}
+        >
+          {showDrag && (
+            <div className="drag-handle">
+              <i className="ti ti-grip-vertical" />
+            </div>
+          )}
+          {batchMode && (
+            <div style={{ padding:'0 10px 0 8px', display:'flex', alignItems:'center', flexShrink:0 }}>
+              <div className={'bcheck' + (isSelected ? ' on' : '')} />
+            </div>
+          )}
           <div className="lib-spine" style={{ background: getSpineColor(b.id) }} />
           <div className="lib-book-info">
             <div className="lib-book-title">
@@ -1258,11 +1415,13 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
               {dates.map(d => <span key={d} className="date-chip">{fmtDate(d)}</span>)}
             </div>
           </div>
-          <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
-            {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?starColor(b.rating):'#DDD0C0'}}/>)}</div>}
-            {rc > 0 && <span style={{fontSize:11,color:'var(--text-light)'}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
-            <button onClick={e=>{e.stopPropagation();setQuickLogBookId(b.id);}} style={{fontSize:11,padding:'3px 9px',borderRadius:8,border:'1px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)'}}>＋ 記錄</button>
-          </div>
+          {!batchMode && (
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
+              {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?starColor(b.rating):'#DDD0C0'}}/>)}</div>}
+              {rc > 0 && <span style={{fontSize:11,color:'var(--text-light)'}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
+              <button onClick={e=>{e.stopPropagation();setQuickLogBookId(b.id);}} style={{fontSize:11,padding:'3px 9px',borderRadius:8,border:'1px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)'}}>＋ 記錄</button>
+            </div>
+          )}
         </div>
         {isEditing && <InlineEditForm b={b} />}
       </>
@@ -1284,6 +1443,16 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
       </div>
 
 
+      {/* Search */}
+      <div style={{ padding:'8px 16px 4px', position:'relative' }}>
+        <i className="ti ti-search" style={{ position:'absolute', left:26, top:'50%', transform:'translateY(-50%)', color:'var(--text-light)', fontSize:15, pointerEvents:'none' }} />
+        <input className="form-input" placeholder="搜尋書名、作者、系列…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+          style={{ paddingLeft:34, paddingTop:7, paddingBottom:7, fontSize:13 }} />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')} style={{ position:'absolute', right:22, top:'50%', transform:'translateY(-50%)', border:'none', background:'none', cursor:'pointer', color:'var(--text-light)', fontSize:18, padding:0, lineHeight:1 }}>×</button>
+        )}
+      </div>
+
       {/* Book section header */}
       <div style={{ padding:'4px 16px 6px', display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
         <span style={{ fontSize:12, fontWeight:700, color:'var(--text-sub)', letterSpacing:'0.08em', textTransform:'uppercase', marginRight:2 }}>藏書</span>
@@ -1300,6 +1469,10 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
             }}>{l} ({cnt})</button>
           ) : null;
         })}
+        <button
+          onClick={() => { setBatchMode(m => !m); setSelectedIds(new Set()); }}
+          style={{ padding:'4px 10px', borderRadius:20, border:'1.5px solid', borderColor:batchMode?'var(--primary)':'var(--card-border)', background:batchMode?'#F5E8DA':'var(--bg)', color:batchMode?'var(--primary-dark)':'var(--text-sub)', fontSize:11, fontWeight:batchMode?700:400, fontFamily:'var(--font-round)', cursor:'pointer', flexShrink:0 }}
+        >{batchMode ? '取消批次' : '批次'}</button>
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{
           marginLeft:'auto', padding:'4px 22px 4px 8px', borderRadius:10,
           border:'0.5px solid var(--card-border)', background:'var(--bg)',
@@ -1312,6 +1485,7 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
           <option value="newest">最新加入</option>
           <option value="az">書名 A-Z</option>
           <option value="count">共讀次數</option>
+          <option value="manual">手動排序</option>
         </select>
         <button onClick={exportData} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 9px', borderRadius:16, border:'0.5px solid var(--card-border)', background:'var(--bg)', color:'var(--text-light)', fontSize:11, fontFamily:'var(--font-round)', cursor:'pointer' }}>
           <i className="ti ti-download" style={{ fontSize:12 }} /> 匯出
@@ -1354,44 +1528,60 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
         </div>
       ) : (
         <>
-          {seriesList.map((series, idx) => {
-            const theme = SERIES_THEMES[idx % SERIES_THEMES.length];
-            const booksInSeries = seriesMap[series];
-            const isOpen = openSeries[series] !== false;
-            return (
-              <div key={series} className="series-block">
-                <div className="series-header"
-                  style={{ background:theme.bg, borderRadius:isOpen?'10px 10px 0 0':'10px', border:'0.5px solid '+theme.border, borderBottom:isOpen?'none':'0.5px solid '+theme.border }}
-                  onClick={() => toggleSeries(series)}>
-                  <div className="series-header-left">
-                    <div className="series-dot" style={{ background:theme.dot }} />
-                    <span className="series-name" style={{ color:theme.text }}>{series}</span>
-                    <span className="series-count" style={{ color:theme.text }}>{booksInSeries.length} 本</span>
-                  </div>
-                  <i className={'ti ti-chevron-down series-chevron'+(isOpen?' open':'')} style={{ color:theme.dot }} />
-                </div>
-                {isOpen && (
-                  <div className="series-books" style={{ borderColor:theme.border }}>
-                    {booksInSeries.map(b => <BookRow key={b.id} b={b} />)}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {standaloneBooks.length > 0 && (
-            <>
-              {seriesList.length > 0 && <div className="standalone-header">單本書</div>}
-              <div style={{ margin:'0 16px 8px' }}>
+          {sortBy === 'manual' ? (
+            /* ── Manual drag-to-reorder flat list ── */
+            <div style={{ margin:'0 16px 8px' }}>
+              {sortedBooks.length === 0 ? (
+                <div className="empty-state"><i className="ti ti-filter-off" /><p>這個分類目前沒有書</p></div>
+              ) : (
                 <div className="series-books" style={{ borderRadius:10, border:'0.5px solid var(--card-border)' }}>
-                  {standaloneBooks.map(b => <BookRow key={b.id} b={b} />)}
+                  {sortedBooks.map(b => <BookRow key={b.id} b={b} sortedForDrag={sortedBooks} />)}
                 </div>
-              </div>
-            </>
-          )}
+              )}
+            </div>
+          ) : (
+            /* ── Grouped by series ── */
+            <>
+              {seriesList.map((series, idx) => {
+                const theme = SERIES_THEMES[idx % SERIES_THEMES.length];
+                const booksInSeries = seriesMap[series];
+                const isOpen = openSeries[series] !== false;
+                return (
+                  <div key={series} className="series-block">
+                    <div className="series-header"
+                      style={{ background:theme.bg, borderRadius:isOpen?'10px 10px 0 0':'10px', border:'0.5px solid '+theme.border, borderBottom:isOpen?'none':'0.5px solid '+theme.border }}
+                      onClick={() => toggleSeries(series)}>
+                      <div className="series-header-left">
+                        <div className="series-dot" style={{ background:theme.dot }} />
+                        <span className="series-name" style={{ color:theme.text }}>{series}</span>
+                        <span className="series-count" style={{ color:theme.text }}>{booksInSeries.length} 本</span>
+                      </div>
+                      <i className={'ti ti-chevron-down series-chevron'+(isOpen?' open':'')} style={{ color:theme.dot }} />
+                    </div>
+                    {isOpen && (
+                      <div className="series-books" style={{ borderColor:theme.border }}>
+                        {booksInSeries.map(b => <BookRow key={b.id} b={b} />)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
 
-          {sortedBooks.length === 0 && (
-            <div className="empty-state"><i className="ti ti-filter-off" /><p>這個分類目前沒有書</p></div>
+              {standaloneBooks.length > 0 && (
+                <>
+                  {seriesList.length > 0 && <div className="standalone-header">單本書</div>}
+                  <div style={{ margin:'0 16px 8px' }}>
+                    <div className="series-books" style={{ borderRadius:10, border:'0.5px solid var(--card-border)' }}>
+                      {standaloneBooks.map(b => <BookRow key={b.id} b={b} />)}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {sortedBooks.length === 0 && (
+                <div className="empty-state"><i className="ti ti-filter-off" /><p>這個分類目前沒有書</p></div>
+              )}
+            </>
           )}
         </>
       )}
@@ -1439,6 +1629,34 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
       <button className="fab-fixed" onClick={() => navigate('add')}>
         <i className="ti ti-plus" />
       </button>
+
+      {/* Batch action bar */}
+      {batchMode && selectedIds.size > 0 && (
+        <div className="batch-bar">
+          <span className="batch-cnt">已選 {selectedIds.size} 本</span>
+          <button className="batch-st" onClick={() => applyBatchStatus('active')}>📖 進行中</button>
+          <button className="batch-st" onClick={() => applyBatchStatus('wantToRead')}>📚 待讀</button>
+          <button className="batch-st" onClick={() => applyBatchStatus('graduated')}>🎓 已畢業</button>
+          <button className="batch-cancel-btn" onClick={() => { setBatchMode(false); setSelectedIds(new Set()); }}>取消</button>
+        </div>
+      )}
+
+      {/* Status action sheet (long press) */}
+      {actionSheetBook && (
+        <div className="sqs-overlay" onClick={() => setActionSheetBook(null)}>
+          <div className="sqs-sheet" onClick={e => e.stopPropagation()}>
+            <div className="sqs-handle" />
+            <div className="sqs-book">{actionSheetBook.title}</div>
+            {[['active','📖 進行中'],['wantToRead','📚 待讀'],['graduated','🎓 已畢業']].map(([v,l]) => (
+              <button key={v} className={'sqs-opt' + ((actionSheetBook.status||'active') === v ? ' on' : '')} onClick={() => applyStatusChange(v)}>
+                {l}
+                {(actionSheetBook.status||'active') === v && <i className="ti ti-check" style={{ marginLeft:'auto', color:'var(--primary)' }} />}
+              </button>
+            ))}
+            <button className="sqs-cancel" onClick={() => setActionSheetBook(null)}>取消</button>
+          </div>
+        </div>
+      )}
 
       {/* Quick Log Modal */}
       {quickLogBookId !== null && (
