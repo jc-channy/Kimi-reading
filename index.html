@@ -98,9 +98,9 @@
   .book-stars { display: flex; gap: 2px; }
   .date-chip {
     background: #F5EDE0;
-    border-radius: 10px;
-    padding: 2px 8px;
-    font-size: 11px; color: var(--text-sub);
+    border-radius: 8px;
+    padding: 1px 6px;
+    font-size: 10px; color: var(--text-sub);
     font-weight: 500;
   }
   .book-card-right { padding: 12px 14px 12px 0; display: flex; align-items: center; }
@@ -1178,7 +1178,7 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
     });
     const result = {};
     Object.entries(m).forEach(([id, dates]) => {
-      result[id] = [...dates].sort((a, b) => b.localeCompare(a)).slice(0, 2);
+      result[id] = [...dates].sort((a, b) => b.localeCompare(a));
     });
     return result;
   }, [records]);
