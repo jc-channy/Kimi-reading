@@ -1598,7 +1598,7 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
       )}
       {showAddForm && (
         <div className="card add-book-form-card" style={{ marginTop:8 }}>
-          <div className="card-title"><i className="ti ti-book-plus" />新增書本</div>
+          <div className="card-title"><i className="ti ti-plus" />新增書本</div>
           <div className="form-group">
             <label className="form-label">書名 *</label>
             <input className="form-input" placeholder="e.g. Green Eggs and Ham" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
@@ -2309,7 +2309,7 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
       {showAddForm ? (
         <div className="card add-book-form-card" style={{ marginTop: 16 }}>
           <div className="card-title">
-            <i className="ti ti-book-plus" />
+            <i className="ti ti-plus" />
             {editBook ? '編輯書本' : '新增書本'}
           </div>
           <div className="form-group">
@@ -2663,7 +2663,7 @@ function DesktopAddBookPage({ books, addBook, exportData, importData, toast }) {
   return (
     <div style={{ padding: '28px 40px', maxWidth: 820 }}>
       <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 24 }}>
-        <i className="ti ti-book-plus" style={{ marginRight: 8, color: 'var(--primary)' }} />新增書本
+        <i className="ti ti-plus" style={{ marginRight: 8, color: 'var(--primary)' }} />新增書本
       </div>
 
       {/* Batch table */}
@@ -2833,7 +2833,7 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
             <i className="ti ti-books" /> 藏書列表
           </button>
           <button className={'d-nav-btn' + (dsktView === 'addbook' ? ' on' : '')} onClick={() => setDsktView('addbook')}>
-            <i className="ti ti-book-plus" /> 新增書本
+            <i className="ti ti-plus" /> 新增書本
           </button>
         </nav>
       </aside>
