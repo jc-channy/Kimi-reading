@@ -721,7 +721,6 @@ function QuickLogModal({ books, addRecord, toast, initialBookId, onClose }) {
   const [bookId, setBookId] = useState(initialBookId || '');
   const [date, setDate] = useState(today());
   const [showDetails, setShowDetails] = useState(false);
-  const [duration, setDuration] = useState('20分鐘');
   const [reaction, setReaction] = useState('');
   const [followed, setFollowed] = useState(false);
   const [sentences, setSentences] = useState('');
@@ -734,7 +733,7 @@ function QuickLogModal({ books, addRecord, toast, initialBookId, onClose }) {
       id: genId(), bookId,
       bookTitle: selectedBook?.title || '',
       date,
-      duration: showDetails ? duration : '',
+      duration: '',
       leloReaction: showDetails ? reaction : '',
       leloFollowed: showDetails ? followed : false,
       leloSentences: showDetails ? sentences : '',
@@ -767,18 +766,10 @@ function QuickLogModal({ books, addRecord, toast, initialBookId, onClose }) {
         </div>
         <button className="ql-details-toggle" onClick={() => setShowDetails(s => !s)}>
           <i className={'ti ti-chevron-' + (showDetails ? 'up' : 'down')} />
-          {showDetails ? '收起細節' : '加更多細節（反應・時間・心得）'}
+          {showDetails ? '收起細節' : '加更多細節（反應・心得）'}
         </button>
         {showDetails && (
           <>
-            <div className="form-group">
-              <label className="form-label">共讀時間</label>
-              <div className="chip-group">
-                {DURATION_OPTIONS.map(d => (
-                  <button key={d} className={'chip' + (duration === d ? ' sel' : '')} onClick={() => setDuration(d)} style={{ fontSize:12, padding:'5px 10px' }}>{d}</button>
-                ))}
-              </div>
-            </div>
             <div className="form-group">
               <label className="form-label">Kimi 的反應</label>
               <div className="reaction-grid">
@@ -917,9 +908,8 @@ function BookDetail({ book, books, records, addRecord, toast, onBack, onEdit }) 
                           {entry.leloReaction && <span style={{ marginLeft:6 }}>{REACTION_ICONS[entry.leloReaction]}</span>}
                           {entry.leloFollowed && <span style={{ marginLeft:4, fontSize:11 }}>🎙</span>}
                         </div>
-                        {(entry.momNotes || entry.leloSentences || entry.duration) && (
+                        {(entry.momNotes || entry.leloSentences) && (
                           <div className="bd-entry-notes">
-                            {entry.duration && <span style={{ marginRight:8 }}>⏱ {entry.duration}</span>}
                             {entry.leloSentences && <span style={{ marginRight:8 }}>💬 「{entry.leloSentences}」</span>}
                             {entry.momNotes && <span>{entry.momNotes}</span>}
                           </div>
@@ -1133,10 +1123,6 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
         setNewSeries(b.series || ''); setNewNotes(b.notes || '');
         setNewRating(b.rating || 0); setBookStatus(b.status || 'active');
         setEditBookId(b.id);
-        setTimeout(() => {
-          const el = document.querySelector('[data-edit-id="' + b.id + '"]');
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 150);
       }
     }
   }, [editTrigger?.n]);
@@ -1272,6 +1258,21 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
     setBatchMode(false);
   }, [selectedIds, books, addBook, toast]);
 
+  const applyBatchLog = useCallback(() => {
+    let count = 0;
+    const t = today();
+    selectedIds.forEach(id => {
+      const b = books.find(x => x.id === id);
+      if (b) {
+        addRecord({ id: genId(), bookId: id, bookTitle: b.title, date: t, duration: '', leloReaction: '', leloFollowed: false, leloSentences: '', momNotes: '', createdAt: t });
+        count++;
+      }
+    });
+    toast(`已為 ${count} 本書新增今日閱讀紀錄`);
+    setSelectedIds(new Set());
+    setBatchMode(false);
+  }, [selectedIds, books, addRecord, toast]);
+
   // ── Drag to reorder ──
   const handleDragStart = useCallback((id) => (e) => {
     dragBookId.current = id;
@@ -1316,57 +1317,9 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
 
   const allSeriesList = useMemo(() => [...new Set(books.filter(b => b.series).map(b => b.series))], [books]);
 
-  // ── Book row with inline edit ──
-  const InlineEditForm = ({ b }) => (
-    <div style={{ background: '#FDF5EC', borderTop: '0.5px solid var(--card-border)', padding: 14 }}>
-      <div style={{ marginBottom: 10 }}>
-        <label className="form-label">書名 *</label>
-        <input className="form-input" value={newTitle} onChange={e => setNewTitle(e.target.value)} style={{ fontSize: 13, padding: '7px 10px' }} />
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-        <div>
-          <label className="form-label">作者</label>
-          <input className="form-input" value={newAuthor} onChange={e => setNewAuthor(e.target.value)} style={{ fontSize: 13, padding: '7px 10px' }} />
-        </div>
-        <div>
-          <label className="form-label">系列</label>
-          <input className="form-input" value={newSeries} onChange={e => setNewSeries(e.target.value)} list="edit-series-list" style={{ fontSize: 13, padding: '7px 10px' }} />
-          <datalist id="edit-series-list">{allSeriesList.map(s => <option key={s} value={s} />)}</datalist>
-        </div>
-      </div>
-      <div style={{ marginBottom: 10 }}>
-        <label className="form-label">備註</label>
-        <input className="form-input" value={newNotes} onChange={e => setNewNotes(e.target.value)} style={{ fontSize: 13, padding: '7px 10px' }} />
-      </div>
-      <div style={{ marginBottom: 10 }}>
-        <label className="form-label">喜愛度</label>
-        <StarRating value={newRating} onChange={setNewRating} />
-      </div>
-      <div style={{ marginBottom: 12 }}>
-        <label className="form-label">狀態</label>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {[['active','📖 進行中'],['wantToRead','📚 待讀'],['graduated','🎓 已畢業']].map(([v,l]) => (
-            <button key={v} className={'chip' + (bookStatus===v?' sel':'')} onClick={() => setBookStatus(v)} style={{ flex:1, textAlign:'center', fontSize:11, padding:'5px 4px' }}>{l}</button>
-          ))}
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn-primary" style={{ flex:1, padding:10 }} onClick={handleSubmit}>
-          <i className="ti ti-check" /> 儲存
-        </button>
-        <button className="btn-secondary" style={{ padding:'10px 14px', fontSize:13 }} onClick={resetForm}>取消</button>
-        <button
-          onClick={() => { if (window.confirm('確定刪除「' + b.title + '」？\n相關的共讀紀錄也會一併刪除。')) { deleteBook(b.id); resetForm(); toast('已刪除'); } }}
-          style={{ padding:'10px 12px', borderRadius:10, border:'1.5px solid #E8A0A0', background:'none', color:'#C04040', fontSize:13, fontFamily:'var(--font-round)', cursor:'pointer' }}
-        ><i className="ti ti-trash" /></button>
-      </div>
-    </div>
-  );
-
   const BookRow = ({ b, sortedForDrag }) => {
     const rc = readCountMap[b.id] || 0;
     const dates = recentDatesMap[b.id] || [];
-    const isEditing = editBookId === b.id;
     const isSelected = selectedIds.has(b.id);
     const isDragOver = dragOverId === b.id;
     const showDrag = sortBy === 'manual' && !batchMode;
@@ -1383,7 +1336,7 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
           className={'lib-book-row' + (isSelected ? ' batch-sel' : '') + (isDragOver ? ' drag-over' : '')}
           data-edit-id={b.id}
           onClick={handleClick}
-          style={{ background: isEditing ? '#FFF8F0' : undefined, userSelect: 'none' }}
+          style={{ userSelect: 'none' }}
           onTouchStart={!batchMode ? handleLongPressStart(b) : undefined}
           onTouchEnd={handleLongPressEnd}
           onTouchMove={handleLongPressMove}
@@ -1423,7 +1376,6 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
             </div>
           )}
         </div>
-        {isEditing && <InlineEditForm b={b} />}
       </>
     );
   };
@@ -1640,6 +1592,7 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
       {batchMode && selectedIds.size > 0 && (
         <div className="batch-bar">
           <span className="batch-cnt">已選 {selectedIds.size} 本</span>
+          <button className="batch-st" onClick={applyBatchLog}>📅 今日打卡</button>
           <button className="batch-st" onClick={() => applyBatchStatus('active')}>📖 進行中</button>
           <button className="batch-st" onClick={() => applyBatchStatus('wantToRead')}>📚 待讀</button>
           <button className="batch-st" onClick={() => applyBatchStatus('graduated')}>🎓 已畢業</button>
@@ -1664,6 +1617,59 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
         </div>
       )}
 
+      {/* Edit Book Modal */}
+      {editBookId !== null && editBook && (
+        <div className="ql-overlay" style={{ zIndex: 400 }} onClick={resetForm}>
+          <div className="ql-sheet" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+              <span style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>編輯書本</span>
+              <button onClick={resetForm} style={{ background:'none', border:'none', fontSize:20, color:'var(--text-light)', cursor:'pointer', lineHeight:1 }}>×</button>
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label className="form-label">書名 *</label>
+              <input className="form-input" value={newTitle} onChange={e => setNewTitle(e.target.value)} style={{ fontSize: 13, padding: '7px 10px' }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+              <div>
+                <label className="form-label">作者</label>
+                <input className="form-input" value={newAuthor} onChange={e => setNewAuthor(e.target.value)} style={{ fontSize: 13, padding: '7px 10px' }} />
+              </div>
+              <div>
+                <label className="form-label">系列</label>
+                <input className="form-input" value={newSeries} onChange={e => setNewSeries(e.target.value)} list="edit-series-list-modal" style={{ fontSize: 13, padding: '7px 10px' }} />
+                <datalist id="edit-series-list-modal">{allSeriesList.map(s => <option key={s} value={s} />)}</datalist>
+              </div>
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label className="form-label">備註</label>
+              <input className="form-input" value={newNotes} onChange={e => setNewNotes(e.target.value)} style={{ fontSize: 13, padding: '7px 10px' }} />
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label className="form-label">喜愛度</label>
+              <StarRating value={newRating} onChange={setNewRating} />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label className="form-label">狀態</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[['active','📖 進行中'],['wantToRead','📚 待讀'],['graduated','🎓 已畢業']].map(([v,l]) => (
+                  <button key={v} className={'chip' + (bookStatus===v?' sel':'')} onClick={() => setBookStatus(v)} style={{ flex:1, textAlign:'center', fontSize:11, padding:'5px 4px' }}>{l}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-primary" style={{ flex:1, padding:10 }} onClick={handleSubmit}>
+                <i className="ti ti-check" /> 儲存
+              </button>
+              <button className="btn-secondary" style={{ padding:'10px 14px', fontSize:13 }} onClick={resetForm}>取消</button>
+              <button
+                onClick={() => { if (window.confirm('確定刪除「' + editBook.title + '」？\n相關的共讀紀錄也會一併刪除。')) { deleteBook(editBook.id); resetForm(); toast('已刪除'); } }}
+                style={{ padding:'10px 12px', borderRadius:10, border:'1.5px solid #E8A0A0', background:'none', color:'#C04040', fontSize:13, fontFamily:'var(--font-round)', cursor:'pointer' }}
+              ><i className="ti ti-trash" /></button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quick Log Modal */}
       {quickLogBookId !== null && (
         <QuickLogModal
@@ -1684,12 +1690,10 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
 function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }) {
   const [date, setDate] = useState(today());
   const [bookId, setBookId] = useState(initialBookId || '');
-  const [duration, setDuration] = useState('20分鐘');
   const [reaction, setReaction] = useState('');
   const [followed, setFollowed] = useState(false);
   const [sentences, setSentences] = useState('');
   const [momNotes, setMomNotes] = useState('');
-  const [updateRating, setUpdateRating] = useState(false);
   const [newRating, setNewRating] = useState(0);
   const [markStatus, setMarkStatus] = useState('active');
   const [showDetails, setShowDetails] = useState(false);
@@ -1719,20 +1723,20 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
     const rec = {
       id: genId(), bookId,
       bookTitle: selectedBook ? selectedBook.title : '',
-      date, duration, leloReaction: reaction,
+      date, duration: '', leloReaction: reaction,
       leloFollowed: followed, leloSentences: sentences,
       momNotes, createdAt: today()
     };
     addRecord(rec);
     if (selectedBook) {
-      const needsUpdate = (updateRating && newRating > 0) || (markStatus !== (selectedBook.status || 'active'));
+      const needsUpdate = (newRating > 0) || (markStatus !== (selectedBook.status || 'active'));
       if (needsUpdate) {
-        addBook({ ...selectedBook, rating: (updateRating && newRating > 0) ? newRating : selectedBook.rating, status: markStatus }, true);
+        addBook({ ...selectedBook, rating: newRating > 0 ? newRating : selectedBook.rating, status: markStatus }, true);
       }
     }
     toast('✓ 紀錄已儲存！');
     navigate('home');
-  }, [bookId, selectedBook, date, duration, reaction, followed, sentences, momNotes, updateRating, newRating, addRecord, addBook, navigate, toast]);
+  }, [bookId, selectedBook, date, reaction, followed, sentences, momNotes, newRating, addRecord, addBook, navigate, toast]);
 
   const handleAddBook = useCallback(() => {
     if (!newTitle.trim()) { toast('請輸入書名'); return; }
@@ -1803,24 +1807,25 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
         )}
       </div>
 
+      {selectedBook && (
+        <div className="card">
+          <div className="card-title"><i className="ti ti-star" />喜愛度</div>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            {selectedBook.rating > 0 && <span style={{ fontSize:12, color:'var(--text-light)' }}>目前 {selectedBook.rating} 星</span>}
+            <StarRating value={newRating || selectedBook.rating} onChange={setNewRating} />
+          </div>
+        </div>
+      )}
+
       <div style={{ padding:'2px 16px 4px' }}>
         <button className="ql-details-toggle" onClick={() => setShowDetails(s => !s)}>
           <i className={'ti ti-chevron-' + (showDetails ? 'up' : 'down')} />
-          {showDetails ? '收起細節' : '加更多細節（反應・時間・心得）'}
+          {showDetails ? '收起細節' : '加更多細節（反應・心得）'}
         </button>
       </div>
 
       {showDetails && (
         <>
-          <div className="card">
-            <div className="card-title"><i className="ti ti-clock" />共讀時間</div>
-            <div className="chip-group">
-              {DURATION_OPTIONS.map(d => (
-                <button key={d} className={'chip' + (duration === d ? ' sel' : '')} onClick={() => setDuration(d)}>{d}</button>
-              ))}
-            </div>
-          </div>
-
           <div className="card">
             <div className="card-title"><i className="ti ti-mood-smile" />Kimi 的反應</div>
             <div className="reaction-grid">
@@ -1855,7 +1860,7 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
           {selectedBook && (
             <div className="card">
               <hr className="dashed-divider" style={{ margin: '0 0 14px' }} />
-              <div style={{ marginBottom: 12 }}>
+              <div>
                 <div className="form-label" style={{ marginBottom: 8 }}>書本狀態</div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {[['active','📖 進行中'], ['wantToRead','📚 待讀'], ['graduated','🎓 已畢業']].map(([v, l]) => (
@@ -1863,20 +1868,6 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
                   ))}
                 </div>
               </div>
-              <div className="toggle-row" style={{ marginBottom: 12 }}>
-                <span className="toggle-label" style={{ fontSize: 13, color: 'var(--text-sub)' }}>
-                  更新喜愛度
-                </span>
-                <button className={'toggle' + (updateRating ? ' on' : '')} onClick={() => setUpdateRating(!updateRating)} />
-              </div>
-              {updateRating && (
-                <div>
-                  <div className="form-label" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    目前：<Stars rating={selectedBook.rating} size={14} />
-                  </div>
-                  <StarRating value={newRating || selectedBook.rating} onChange={setNewRating} />
-                </div>
-              )}
             </div>
           )}
         </>
