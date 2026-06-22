@@ -348,6 +348,66 @@
   /* Textarea */
   textarea.form-input { resize: vertical; min-height: 72px; }
 
+  /* ── Quick Log Modal ── */
+  .ql-overlay {
+    position: fixed; inset: 0; background: rgba(58,40,16,0.38);
+    z-index: 200; display: flex; align-items: flex-end;
+  }
+  @keyframes qlSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .ql-sheet {
+    background: var(--card); border-radius: 24px 24px 0 0;
+    width: 100%; padding: 20px 20px 36px;
+    animation: qlSlideUp 0.25s ease; max-height: 88vh; overflow-y: auto;
+  }
+  .ql-handle { width: 40px; height: 4px; background: #DDD0C0; border-radius: 2px; margin: 0 auto 18px; }
+  .ql-details-toggle {
+    background: none; border: none; color: var(--primary);
+    font-size: 13px; font-family: var(--font-round); cursor: pointer;
+    padding: 6px 0; display: flex; align-items: center; gap: 5px; margin-bottom: 8px;
+  }
+  @media (min-width: 900px) {
+    .ql-overlay { align-items: center; justify-content: center; }
+    .ql-sheet { border-radius: 20px; max-width: 420px; padding: 24px 24px 28px; }
+  }
+  @keyframes qlFadeScale { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+
+  /* ── Book Detail ── */
+  .bd-header {
+    background: linear-gradient(160deg, var(--hero-a) 0%, var(--hero-b) 60%, var(--hero-c) 100%);
+    padding: 20px 16px 16px; flex-shrink: 0;
+  }
+  .bd-back {
+    display: flex; align-items: center; gap: 4px; background: none; border: none;
+    color: var(--primary-dark); font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: var(--font-round); padding: 0; margin-bottom: 10px;
+  }
+  .bd-title { font-size: 21px; font-weight: 700; color: var(--text); line-height: 1.3; }
+  .bd-author { font-size: 13px; color: var(--text-sub); margin-top: 3px; }
+  .bd-stats-row { display: flex; gap: 8px; margin-top: 14px; }
+  .bd-stat {
+    background: rgba(255,255,255,0.72); border-radius: 12px; padding: 8px 10px;
+    flex: 1; text-align: center; border: 0.5px solid var(--card-border); backdrop-filter: blur(4px);
+  }
+  .bd-stat-num { font-size: 20px; font-weight: 800; color: var(--primary); line-height: 1; }
+  .bd-stat-lbl { font-size: 10px; color: var(--text-sub); margin-top: 2px; }
+  .bd-log-btn {
+    width: 100%; padding: 13px;
+    background: var(--primary-btn); color: #fff; border: none; border-radius: 12px;
+    font-size: 15px; font-weight: 700; font-family: var(--font-round); cursor: pointer;
+    box-shadow: 0 3px 12px rgba(168,104,56,0.28); transition: opacity 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .bd-log-btn:active { opacity: 0.82; }
+  .bd-timeline { padding: 16px 16px 48px; }
+  .bd-month-group { margin-bottom: 20px; }
+  .bd-month-lbl { font-size: 11px; font-weight: 700; color: var(--text-sub); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px; }
+  .bd-entry { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start; }
+  .bd-dot-col { display: flex; flex-direction: column; align-items: center; padding-top: 4px; }
+  .bd-dot { width: 10px; height: 10px; border: 2.5px solid var(--primary); background: #F0C9A0; border-radius: 50%; flex-shrink: 0; }
+  .bd-line { width: 2px; flex: 1; background: #ECD8C0; min-height: 14px; margin-top: 3px; }
+  .bd-entry-date { font-size: 14px; font-weight: 600; color: var(--text); }
+  .bd-entry-notes { font-size: 12px; color: var(--text-sub); margin-top: 3px; line-height: 1.5; }
+
   @media (min-width: 600px) and (max-width: 899px) {
     .page { max-width: 480px; margin: 0 auto; }
     .bottom-nav { max-width: 480px; left: 50%; transform: translateX(-50%); }
@@ -551,10 +611,234 @@ function Toast({ msg }) {
   return <div className="toast">{msg}</div>;
 }
 
+/* ── QuickLogModal ── */
+function QuickLogModal({ books, addRecord, toast, initialBookId, onClose }) {
+  const [bookId, setBookId] = useState(initialBookId || '');
+  const [date, setDate] = useState(today());
+  const [showDetails, setShowDetails] = useState(false);
+  const [duration, setDuration] = useState('20分鐘');
+  const [reaction, setReaction] = useState('');
+  const [followed, setFollowed] = useState(false);
+  const [sentences, setSentences] = useState('');
+  const [momNotes, setMomNotes] = useState('');
+  const selectedBook = useMemo(() => books.find(b => b.id === bookId), [books, bookId]);
+
+  const handleSave = () => {
+    if (!bookId) { toast('請選擇書本'); return; }
+    addRecord({
+      id: genId(), bookId,
+      bookTitle: selectedBook?.title || '',
+      date,
+      duration: showDetails ? duration : '',
+      leloReaction: showDetails ? reaction : '',
+      leloFollowed: showDetails ? followed : false,
+      leloSentences: showDetails ? sentences : '',
+      momNotes: showDetails ? momNotes : '',
+      createdAt: today()
+    });
+    toast('✓ 已記錄' + (selectedBook ? ' ' + selectedBook.title : '') + '！');
+    onClose();
+  };
+
+  const activeBooks = books.filter(b => (b.status || 'active') !== 'wantToRead');
+
+  return (
+    <div className="ql-overlay" onClick={onClose}>
+      <div className="ql-sheet" onClick={e => e.stopPropagation()}>
+        <div className="ql-handle" />
+        <div style={{ fontSize:17, fontWeight:700, color:'var(--text)', marginBottom:16 }}>快速打卡 ⚡</div>
+        <div className="form-group">
+          <label className="form-label">書本 *</label>
+          <select className="form-select" value={bookId} onChange={e => setBookId(e.target.value)}>
+            <option value="">請選擇...</option>
+            {activeBooks.map(b => (
+              <option key={b.id} value={b.id}>{b.title}{b.series ? ' · ' + b.series : ''}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group" style={{ marginBottom:4 }}>
+          <label className="form-label">日期</label>
+          <input type="date" className="form-input" value={date} onChange={e => setDate(e.target.value)} />
+        </div>
+        <button className="ql-details-toggle" onClick={() => setShowDetails(s => !s)}>
+          <i className={'ti ti-chevron-' + (showDetails ? 'up' : 'down')} />
+          {showDetails ? '收起細節' : '加更多細節（反應・時間・心得）'}
+        </button>
+        {showDetails && (
+          <>
+            <div className="form-group">
+              <label className="form-label">共讀時間</label>
+              <div className="chip-group">
+                {DURATION_OPTIONS.map(d => (
+                  <button key={d} className={'chip' + (duration === d ? ' sel' : '')} onClick={() => setDuration(d)} style={{ fontSize:12, padding:'5px 10px' }}>{d}</button>
+                ))}
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">樂樂的反應</label>
+              <div className="reaction-grid">
+                {REACTION_OPTIONS.map(r => (
+                  <button key={r.value} className={'reaction-btn' + (reaction === r.value ? ' sel' : '')} onClick={() => setReaction(r.value)} style={{ fontSize:12, padding:'8px 6px' }}>
+                    <i className={'ti ti-' + r.icon} /> {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="form-group">
+              <div className="toggle-row">
+                <span className="toggle-label" style={{ fontSize:13 }}>
+                  <i className="ti ti-microphone" style={{ marginRight:6, color:'var(--primary)' }} />樂樂有跟著唸/唱
+                </span>
+                <button className={'toggle' + (followed ? ' on' : '')} onClick={() => setFollowed(!followed)} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">學到的句子</label>
+              <input className="form-input" placeholder="今天學到什麼句子？" value={sentences} onChange={e => setSentences(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">媽媽的觀察</label>
+              <textarea className="form-input" placeholder="有趣的互動、觀察..." value={momNotes} onChange={e => setMomNotes(e.target.value)} style={{ minHeight:72 }} />
+            </div>
+          </>
+        )}
+        <div style={{ display:'flex', gap:8, marginTop:8 }}>
+          <button className="btn-primary" style={{ flex:1 }} onClick={handleSave}>
+            <i className="ti ti-check" /> 完成記錄
+          </button>
+          <button className="btn-secondary" onClick={onClose}>取消</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── BookDetail ── */
+function BookDetail({ book, books, records, addRecord, toast, onBack }) {
+  const bookRecords = useMemo(() =>
+    records.filter(r => r.bookId === book.id).sort((a,b) => b.date.localeCompare(a.date)),
+    [records, book.id]
+  );
+  const readCount = bookRecords.length;
+  const monthsRead = useMemo(() => new Set(bookRecords.map(r => r.date.slice(0,7))).size, [bookRecords]);
+  const lastRead = bookRecords[0]?.date || null;
+  const [quickLogOpen, setQuickLogOpen] = useState(false);
+
+  const grouped = useMemo(() => {
+    const groups = {};
+    bookRecords.forEach(r => {
+      const month = r.date.slice(0,7);
+      if (!groups[month]) groups[month] = [];
+      groups[month].push(r);
+    });
+    return Object.entries(groups).sort((a,b) => b[0].localeCompare(a[0]));
+  }, [bookRecords]);
+
+  const fmtMonthLabel = (ym) => {
+    const [y, m] = ym.split('-');
+    return y + '年 ' + parseInt(m) + '月';
+  };
+  const fmtFullDate = (s) => {
+    if (!s) return '';
+    const [,m,d] = s.split('-');
+    return parseInt(m) + '月 ' + parseInt(d) + '日';
+  };
+  const REACTION_ICONS = { love: '❤️', like: '👍', ok: '😐', skip: '😔' };
+
+  return (
+    <div className="page" style={{ paddingBottom:0 }}>
+      <div className="bd-header">
+        <button className="bd-back" onClick={onBack}>
+          <i className="ti ti-arrow-left" /> 返回書單
+        </button>
+        <div className="bd-title">{book.title}</div>
+        {book.author && <div className="bd-author">{book.author}</div>}
+        {book.series && <div style={{ fontSize:12, color:'var(--text-light)', marginTop:2 }}>{book.series}</div>}
+        {book.rating > 0 && <div style={{ marginTop:8 }}><Stars rating={book.rating} size={14} /></div>}
+        <div className="bd-stats-row">
+          <div className="bd-stat">
+            <div className="bd-stat-num">{readCount}</div>
+            <div className="bd-stat-lbl">共讀次數</div>
+          </div>
+          <div className="bd-stat">
+            <div className="bd-stat-num">{monthsRead || 0}</div>
+            <div className="bd-stat-lbl">共讀月份</div>
+          </div>
+          {lastRead && (
+            <div className="bd-stat">
+              <div className="bd-stat-num" style={{ fontSize:15, paddingTop:3 }}>{fmtDate(lastRead)}</div>
+              <div className="bd-stat-lbl">上次</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ padding:'12px 16px 0' }}>
+        <button className="bd-log-btn" onClick={() => setQuickLogOpen(true)}>
+          <i className="ti ti-plus" /> 記錄今天
+        </button>
+      </div>
+
+      <div className="bd-timeline">
+        {bookRecords.length === 0 ? (
+          <div className="empty-state">
+            <i className="ti ti-calendar-off" />
+            <p>還沒有共讀紀錄<br />點上方「記錄今天」開始吧</p>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--text-sub)', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:12 }}>共讀日期紀錄</div>
+            {grouped.map(([month, entries], groupIdx) => (
+              <div key={month} className="bd-month-group">
+                <div className="bd-month-lbl">{fmtMonthLabel(month)}</div>
+                {entries.map((entry, entryIdx) => {
+                  const isLast = groupIdx === grouped.length - 1 && entryIdx === entries.length - 1;
+                  return (
+                    <div key={entry.id} className="bd-entry">
+                      <div className="bd-dot-col">
+                        <div className="bd-dot" />
+                        {!isLast && <div className="bd-line" />}
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <div className="bd-entry-date">
+                          {fmtFullDate(entry.date)}
+                          {entry.leloReaction && <span style={{ marginLeft:6 }}>{REACTION_ICONS[entry.leloReaction]}</span>}
+                          {entry.leloFollowed && <span style={{ marginLeft:4, fontSize:11 }}>🎙</span>}
+                        </div>
+                        {(entry.momNotes || entry.leloSentences || entry.duration) && (
+                          <div className="bd-entry-notes">
+                            {entry.duration && <span style={{ marginRight:8 }}>⏱ {entry.duration}</span>}
+                            {entry.leloSentences && <span style={{ marginRight:8 }}>💬 「{entry.leloSentences}」</span>}
+                            {entry.momNotes && <span>{entry.momNotes}</span>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+
+      {quickLogOpen && (
+        <QuickLogModal
+          books={books}
+          addRecord={addRecord}
+          toast={toast}
+          initialBookId={book.id}
+          onClose={() => setQuickLogOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════
    Dashboard (merged with BookLibrary)
 ═══════════════════════════════════════ */
-function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, importData, toast, addBookTrigger, hideAddBtn }) {
+function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, exportData, importData, toast, addBookTrigger, hideAddBtn }) {
   // ── Stats ──
   const totalDays = useMemo(() => new Set(records.map(r => r.date)).size, [records]);
 
@@ -604,6 +888,7 @@ function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, 
   const [importMode, setImportMode] = useState(null);
   const [pendingImport, setPendingImport] = useState(null);
   const fileInputRef = React.useRef(null);
+  const [quickLogBookId, setQuickLogBookId] = useState(null); // null=closed, string=open
 
   const ROW_COL_MAP = {
     '書名': 'title', 'title': 'title',
@@ -855,7 +1140,7 @@ function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, 
     const isEditing = editBookId === b.id;
     return (
       <>
-        <div className="lib-book-row" onClick={() => openEditBook(b)} style={{ background: isEditing ? '#FFF8F0' : undefined }}>
+        <div className="lib-book-row" onClick={() => navigate('detail', {bookId: b.id})} style={{ background: isEditing ? '#FFF8F0' : undefined }}>
           <div className="lib-spine" style={{ background: getSpineColor(b.id) }} />
           <div className="lib-book-info">
             <div className="lib-book-title">
@@ -871,7 +1156,10 @@ function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, 
           <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
             {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?starColor(b.rating):'#DDD0C0'}}/>)}</div>}
             {rc > 0 && <span style={{fontSize:11,color:'var(--text-light)'}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
-            <button onClick={e=>{e.stopPropagation();navigate('add',{bookId:b.id});}} style={{fontSize:11,padding:'2px 7px',borderRadius:8,border:'1px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)'}}>＋ 記錄</button>
+            <div style={{ display:'flex', gap:4 }}>
+              <button onClick={e=>{e.stopPropagation();openEditBook(b);}} style={{fontSize:11,padding:'2px 6px',borderRadius:8,border:'1px solid var(--card-border)',background:'var(--bg)',color:'var(--text-light)',cursor:'pointer',fontFamily:'var(--font-round)',lineHeight:'1.5'}} title="編輯">✏️</button>
+              <button onClick={e=>{e.stopPropagation();setQuickLogBookId(b.id);}} style={{fontSize:11,padding:'2px 7px',borderRadius:8,border:'1px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)'}}>＋ 記錄</button>
+            </div>
           </div>
         </div>
         {isEditing && <InlineEditForm b={b} />}
@@ -1049,6 +1337,17 @@ function Dashboard({ books, records, navigate, addBook, deleteBook, exportData, 
       <button className="fab-fixed" onClick={() => navigate('add')}>
         <i className="ti ti-plus" />
       </button>
+
+      {/* Quick Log Modal */}
+      {quickLogBookId !== null && (
+        <QuickLogModal
+          books={books}
+          addRecord={addRecord}
+          toast={toast}
+          initialBookId={quickLogBookId}
+          onClose={() => setQuickLogBookId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1067,6 +1366,7 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
   const [updateRating, setUpdateRating] = useState(false);
   const [newRating, setNewRating] = useState(0);
   const [markStatus, setMarkStatus] = useState('active');
+  const [showDetails, setShowDetails] = useState(false);
 
   const [addingBook, setAddingBook] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -1177,72 +1477,83 @@ function AddRecord({ books, addRecord, addBook, navigate, toast, initialBookId }
         )}
       </div>
 
-      <div className="card">
-        <div className="card-title"><i className="ti ti-clock" />共讀時間</div>
-        <div className="chip-group">
-          {DURATION_OPTIONS.map(d => (
-            <button key={d} className={'chip' + (duration === d ? ' sel' : '')} onClick={() => setDuration(d)}>{d}</button>
-          ))}
-        </div>
+      <div style={{ padding:'2px 16px 4px' }}>
+        <button className="ql-details-toggle" onClick={() => setShowDetails(s => !s)}>
+          <i className={'ti ti-chevron-' + (showDetails ? 'up' : 'down')} />
+          {showDetails ? '收起細節' : '加更多細節（反應・時間・心得）'}
+        </button>
       </div>
 
-      <div className="card">
-        <div className="card-title"><i className="ti ti-mood-smile" />樂樂的反應</div>
-        <div className="reaction-grid">
-          {REACTION_OPTIONS.map(r => (
-            <button key={r.value} className={'reaction-btn' + (reaction === r.value ? ' sel' : '')} onClick={() => setReaction(r.value)}>
-              <i className={'ti ti-' + r.icon} /> {r.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="toggle-row">
-          <span className="toggle-label">
-            <i className="ti ti-microphone" style={{ marginRight: 6, color: 'var(--primary)' }} />
-            樂樂有跟著唸/唱
-          </span>
-          <button className={'toggle' + (followed ? ' on' : '')} onClick={() => setFollowed(!followed)} />
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-title"><i className="ti ti-quote" />學到的句子（選填）</div>
-        <input className="form-input" placeholder="今天學到什麼句子？" value={sentences} onChange={e => setSentences(e.target.value)} />
-      </div>
-
-      <div className="card">
-        <div className="card-title"><i className="ti ti-notes" />媽媽的觀察（選填）</div>
-        <textarea className="form-input" placeholder="有趣的互動、觀察..." value={momNotes} onChange={e => setMomNotes(e.target.value)} />
-      </div>
-
-      {selectedBook && (
-        <div className="card">
-          <hr className="dashed-divider" style={{ margin: '0 0 14px' }} />
-          <div style={{ marginBottom: 12 }}>
-            <div className="form-label" style={{ marginBottom: 8 }}>書本狀態</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[['active','📖 進行中'], ['wantToRead','📚 待讀'], ['graduated','🎓 已畢業']].map(([v, l]) => (
-                <button key={v} className={'chip' + (markStatus === v ? ' sel' : '')} onClick={() => setMarkStatus(v)} style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{l}</button>
+      {showDetails && (
+        <>
+          <div className="card">
+            <div className="card-title"><i className="ti ti-clock" />共讀時間</div>
+            <div className="chip-group">
+              {DURATION_OPTIONS.map(d => (
+                <button key={d} className={'chip' + (duration === d ? ' sel' : '')} onClick={() => setDuration(d)}>{d}</button>
               ))}
             </div>
           </div>
-          <div className="toggle-row" style={{ marginBottom: 12 }}>
-            <span className="toggle-label" style={{ fontSize: 13, color: 'var(--text-sub)' }}>
-              更新喜愛度
-            </span>
-            <button className={'toggle' + (updateRating ? ' on' : '')} onClick={() => setUpdateRating(!updateRating)} />
+
+          <div className="card">
+            <div className="card-title"><i className="ti ti-mood-smile" />樂樂的反應</div>
+            <div className="reaction-grid">
+              {REACTION_OPTIONS.map(r => (
+                <button key={r.value} className={'reaction-btn' + (reaction === r.value ? ' sel' : '')} onClick={() => setReaction(r.value)}>
+                  <i className={'ti ti-' + r.icon} /> {r.label}
+                </button>
+              ))}
+            </div>
           </div>
-          {updateRating && (
-            <div>
-              <div className="form-label" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                目前：<Stars rating={selectedBook.rating} size={14} />
+
+          <div className="card">
+            <div className="toggle-row">
+              <span className="toggle-label">
+                <i className="ti ti-microphone" style={{ marginRight: 6, color: 'var(--primary)' }} />
+                樂樂有跟著唸/唱
+              </span>
+              <button className={'toggle' + (followed ? ' on' : '')} onClick={() => setFollowed(!followed)} />
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title"><i className="ti ti-quote" />學到的句子（選填）</div>
+            <input className="form-input" placeholder="今天學到什麼句子？" value={sentences} onChange={e => setSentences(e.target.value)} />
+          </div>
+
+          <div className="card">
+            <div className="card-title"><i className="ti ti-notes" />媽媽的觀察（選填）</div>
+            <textarea className="form-input" placeholder="有趣的互動、觀察..." value={momNotes} onChange={e => setMomNotes(e.target.value)} />
+          </div>
+
+          {selectedBook && (
+            <div className="card">
+              <hr className="dashed-divider" style={{ margin: '0 0 14px' }} />
+              <div style={{ marginBottom: 12 }}>
+                <div className="form-label" style={{ marginBottom: 8 }}>書本狀態</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[['active','📖 進行中'], ['wantToRead','📚 待讀'], ['graduated','🎓 已畢業']].map(([v, l]) => (
+                    <button key={v} className={'chip' + (markStatus === v ? ' sel' : '')} onClick={() => setMarkStatus(v)} style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{l}</button>
+                  ))}
+                </div>
               </div>
-              <StarRating value={newRating || selectedBook.rating} onChange={setNewRating} />
+              <div className="toggle-row" style={{ marginBottom: 12 }}>
+                <span className="toggle-label" style={{ fontSize: 13, color: 'var(--text-sub)' }}>
+                  更新喜愛度
+                </span>
+                <button className={'toggle' + (updateRating ? ' on' : '')} onClick={() => setUpdateRating(!updateRating)} />
+              </div>
+              {updateRating && (
+                <div>
+                  <div className="form-label" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    目前：<Stars rating={selectedBook.rating} size={14} />
+                  </div>
+                  <StarRating value={newRating || selectedBook.rating} onChange={setNewRating} />
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
 
       <div style={{ padding: '8px 16px 8px' }}>
@@ -1745,9 +2056,17 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
 function DesktopLayout({ books, records, page, navigate, addRecord, addBook, deleteBook, exportData, importData, toast }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelBookId, setPanelBookId] = useState('');
+  const [panelMode, setPanelMode] = useState('add'); // 'add' | 'detail'
+  const [detailBookId, setDetailBookId] = useState('');
 
   const openPanel = useCallback((bookId) => {
     setPanelBookId(bookId || '');
+    setPanelMode('add');
+    setPanelOpen(true);
+  }, []);
+  const openDetailPanel = useCallback((bookId) => {
+    setDetailBookId(bookId || '');
+    setPanelMode('detail');
     setPanelOpen(true);
   }, []);
   const closePanel = useCallback(() => setPanelOpen(false), []);
@@ -1778,8 +2097,9 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
   const panelNavigate = useCallback(() => closePanel(), [closePanel]);
   const desktopNavigate = useCallback((p, params) => {
     if (p === 'add') { openPanel(params?.bookId || ''); }
+    else if (p === 'detail') { openDetailPanel(params?.bookId || ''); }
     else { navigate(p); }
-  }, [navigate, openPanel]);
+  }, [navigate, openPanel, openDetailPanel]);
 
   return (
     <div className="d-layout">
@@ -1831,6 +2151,7 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
       <main className="d-main">
         <Dashboard
           books={books} records={records} navigate={desktopNavigate}
+          addRecord={addRecord}
           addBook={addBook} deleteBook={deleteBook}
           exportData={exportData} importData={importData} toast={toast}
           addBookTrigger={addBookTrigger} hideAddBtn={true}
@@ -1841,18 +2162,42 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
       {panelOpen && (
         <div className="d-overlay" onClick={closePanel}>
           <div className="d-panel" onClick={e => e.stopPropagation()}>
-            <div className="d-panel-hdr">
-              <div className="d-panel-title"><i className="ti ti-pencil" />記錄共讀</div>
-              <button className="d-close-btn" onClick={closePanel}><i className="ti ti-x" /></button>
-            </div>
-            <AddRecord
-              books={books}
-              addRecord={addRecord}
-              addBook={addBook}
-              navigate={panelNavigate}
-              toast={toast}
-              initialBookId={panelBookId}
-            />
+            {panelMode === 'detail' ? (() => {
+              const detailBook = books.find(b => b.id === detailBookId);
+              return (
+                <>
+                  <div className="d-panel-hdr">
+                    <div className="d-panel-title"><i className="ti ti-book-2" />共讀紀錄</div>
+                    <button className="d-close-btn" onClick={closePanel}><i className="ti ti-x" /></button>
+                  </div>
+                  {detailBook ? (
+                    <BookDetail
+                      book={detailBook}
+                      books={books}
+                      records={records}
+                      addRecord={addRecord}
+                      toast={toast}
+                      onBack={closePanel}
+                    />
+                  ) : null}
+                </>
+              );
+            })() : (
+              <>
+                <div className="d-panel-hdr">
+                  <div className="d-panel-title"><i className="ti ti-pencil" />記錄共讀</div>
+                  <button className="d-close-btn" onClick={closePanel}><i className="ti ti-x" /></button>
+                </div>
+                <AddRecord
+                  books={books}
+                  addRecord={addRecord}
+                  addBook={addBook}
+                  navigate={panelNavigate}
+                  toast={toast}
+                  initialBookId={panelBookId}
+                />
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1973,6 +2318,7 @@ function App() {
           {page === 'home' && (
             <Dashboard
               books={books} records={records} navigate={navigate}
+              addRecord={addRecord}
               addBook={addBook} deleteBook={deleteBook}
               exportData={exportData} importData={importData} toast={toast}
             />
@@ -1987,6 +2333,19 @@ function App() {
               initialBookId={navParam.bookId || ''}
             />
           )}
+          {page === 'detail' && (() => {
+            const detailBook = books.find(b => b.id === navParam.bookId);
+            return detailBook ? (
+              <BookDetail
+                book={detailBook}
+                books={books}
+                records={records}
+                addRecord={addRecord}
+                toast={toast}
+                onBack={() => navigate('home')}
+              />
+            ) : null;
+          })()}
         </>
       )}
       {toastMsg && <Toast key={toastKey} msg={toastMsg} />}
