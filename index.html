@@ -953,12 +953,20 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
   };
 
   const parseSheet = (sheet, colMap) => {
-    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-    return rows.map(row => {
+    // Read as raw arrays so we can skip non-header rows (e.g. "表格 1" prefix rows)
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', header: 1 });
+    let headerIdx = 0;
+    for (let i = 0; i < Math.min(rawRows.length, 5); i++) {
+      if (rawRows[i].some(cell => colMap[String(cell).trim()] || colMap[String(cell).toLowerCase().trim()])) {
+        headerIdx = i; break;
+      }
+    }
+    const headers = rawRows[headerIdx] || [];
+    return rawRows.slice(headerIdx + 1).map(row => {
       const obj = {};
-      Object.entries(row).forEach(([k, v]) => {
-        const mapped = colMap[k] || colMap[k.toLowerCase().trim()];
-        if (mapped) obj[mapped] = v;
+      headers.forEach((h, i) => {
+        const mapped = colMap[String(h).trim()] || colMap[String(h).toLowerCase().trim()];
+        if (mapped && row[i] !== undefined && row[i] !== '') obj[mapped] = String(row[i]);
       });
       return obj;
     }).filter(obj => Object.keys(obj).length > 0);
@@ -1657,12 +1665,20 @@ function BookLibrary({ books, records, addBook, deleteBook, exportData, importDa
   };
 
   const parseSheet = (sheet, colMap) => {
-    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-    return rows.map(row => {
+    // Read as raw arrays so we can skip non-header rows (e.g. "表格 1" prefix rows)
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', header: 1 });
+    let headerIdx = 0;
+    for (let i = 0; i < Math.min(rawRows.length, 5); i++) {
+      if (rawRows[i].some(cell => colMap[String(cell).trim()] || colMap[String(cell).toLowerCase().trim()])) {
+        headerIdx = i; break;
+      }
+    }
+    const headers = rawRows[headerIdx] || [];
+    return rawRows.slice(headerIdx + 1).map(row => {
       const obj = {};
-      Object.entries(row).forEach(([k, v]) => {
-        const mapped = colMap[k] || colMap[k.toLowerCase().trim()];
-        if (mapped) obj[mapped] = v;
+      headers.forEach((h, i) => {
+        const mapped = colMap[String(h).trim()] || colMap[String(h).toLowerCase().trim()];
+        if (mapped && row[i] !== undefined && row[i] !== '') obj[mapped] = String(row[i]);
       });
       return obj;
     }).filter(obj => Object.keys(obj).length > 0);
