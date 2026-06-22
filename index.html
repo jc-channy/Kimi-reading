@@ -714,7 +714,7 @@ function QuickLogModal({ books, addRecord, toast, initialBookId, onClose }) {
 }
 
 /* ── BookDetail ── */
-function BookDetail({ book, books, records, addRecord, toast, onBack }) {
+function BookDetail({ book, books, records, addRecord, toast, onBack, onEdit }) {
   const bookRecords = useMemo(() =>
     records.filter(r => r.bookId === book.id).sort((a,b) => b.date.localeCompare(a.date)),
     [records, book.id]
@@ -748,9 +748,16 @@ function BookDetail({ book, books, records, addRecord, toast, onBack }) {
   return (
     <div className="page" style={{ paddingBottom:0 }}>
       <div className="bd-header">
-        <button className="bd-back" onClick={onBack}>
-          <i className="ti ti-arrow-left" /> 返回書單
-        </button>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <button className="bd-back" onClick={onBack}>
+            <i className="ti ti-arrow-left" /> 返回書單
+          </button>
+          {onEdit && (
+            <button onClick={() => onEdit(book)} style={{ display:'flex', alignItems:'center', gap:4, background:'rgba(255,255,255,0.65)', border:'0.5px solid var(--card-border)', borderRadius:8, padding:'4px 10px', color:'var(--text-sub)', fontSize:12, fontFamily:'var(--font-round)', cursor:'pointer' }}>
+              <i className="ti ti-pencil" style={{ fontSize:13 }} /> 編輯
+            </button>
+          )}
+        </div>
         <div className="bd-title">{book.title}</div>
         {book.author && <div className="bd-author">{book.author}</div>}
         {book.series && <div style={{ fontSize:12, color:'var(--text-light)', marginTop:2 }}>{book.series}</div>}
@@ -838,7 +845,7 @@ function BookDetail({ book, books, records, addRecord, toast, onBack }) {
 /* ═══════════════════════════════════════
    Dashboard (merged with BookLibrary)
 ═══════════════════════════════════════ */
-function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, exportData, importData, toast, addBookTrigger, hideAddBtn }) {
+function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, exportData, importData, toast, addBookTrigger, hideAddBtn, editTrigger }) {
   // ── Stats ──
   const totalDays = useMemo(() => new Set(records.map(r => r.date)).size, [records]);
 
@@ -995,6 +1002,24 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
     if (addBookTrigger > 0) { resetForm(); setShowAddForm(true); setTimeout(() => { const el = document.querySelector('.add-book-form-card'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 100); }
   }, [addBookTrigger]);
 
+  useEffect(() => {
+    if (editTrigger && editTrigger.n > 0 && editTrigger.bookId) {
+      const b = books.find(b => b.id === editTrigger.bookId);
+      if (b) {
+        setShowAddForm(false);
+        setEditBook(b);
+        setNewTitle(b.title); setNewAuthor(b.author || '');
+        setNewSeries(b.series || ''); setNewNotes(b.notes || '');
+        setNewRating(b.rating || 0); setBookStatus(b.status || 'active');
+        setEditBookId(b.id);
+        setTimeout(() => {
+          const el = document.querySelector('[data-edit-id="' + b.id + '"]');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
+      }
+    }
+  }, [editTrigger?.n]);
+
   const openEditBook = (b) => {
     if (editBookId === b.id) { resetForm(); return; }
     setShowAddForm(false);
@@ -1140,7 +1165,7 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
     const isEditing = editBookId === b.id;
     return (
       <>
-        <div className="lib-book-row" onClick={() => navigate('detail', {bookId: b.id})} style={{ background: isEditing ? '#FFF8F0' : undefined }}>
+        <div className="lib-book-row" data-edit-id={b.id} onClick={() => navigate('detail', {bookId: b.id})} style={{ background: isEditing ? '#FFF8F0' : undefined }}>
           <div className="lib-spine" style={{ background: getSpineColor(b.id) }} />
           <div className="lib-book-info">
             <div className="lib-book-title">
@@ -1156,10 +1181,7 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
           <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
             {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?starColor(b.rating):'#DDD0C0'}}/>)}</div>}
             {rc > 0 && <span style={{fontSize:11,color:'var(--text-light)'}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
-            <div style={{ display:'flex', gap:4 }}>
-              <button onClick={e=>{e.stopPropagation();openEditBook(b);}} style={{fontSize:11,padding:'2px 6px',borderRadius:8,border:'1px solid var(--card-border)',background:'var(--bg)',color:'var(--text-light)',cursor:'pointer',fontFamily:'var(--font-round)',lineHeight:'1.5'}} title="編輯">✏️</button>
-              <button onClick={e=>{e.stopPropagation();setQuickLogBookId(b.id);}} style={{fontSize:11,padding:'2px 7px',borderRadius:8,border:'1px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)'}}>＋ 記錄</button>
-            </div>
+            <button onClick={e=>{e.stopPropagation();setQuickLogBookId(b.id);}} style={{fontSize:11,padding:'3px 9px',borderRadius:8,border:'1px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)'}}>＋ 記錄</button>
           </div>
         </div>
         {isEditing && <InlineEditForm b={b} />}
@@ -2093,6 +2115,7 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
   }, [records]);
 
   const [addBookTrigger, setAddBookTrigger] = useState(0);
+  const [editTrigger, setEditTrigger] = useState({ n: 0, bookId: null });
 
   const panelNavigate = useCallback(() => closePanel(), [closePanel]);
   const desktopNavigate = useCallback((p, params) => {
@@ -2155,6 +2178,7 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
           addBook={addBook} deleteBook={deleteBook}
           exportData={exportData} importData={importData} toast={toast}
           addBookTrigger={addBookTrigger} hideAddBtn={true}
+          editTrigger={editTrigger}
         />
       </main>
 
@@ -2178,6 +2202,7 @@ function DesktopLayout({ books, records, page, navigate, addRecord, addBook, del
                       addRecord={addRecord}
                       toast={toast}
                       onBack={closePanel}
+                      onEdit={(b) => { setEditTrigger(prev => ({ n: prev.n + 1, bookId: b.id })); closePanel(); }}
                     />
                   ) : null}
                 </>
@@ -2225,6 +2250,7 @@ function App() {
   });
   const [page, setPage] = useState('home');
   const [navParam, setNavParam] = useState({});
+  const [editTrigger, setEditTrigger] = useState({ n: 0, bookId: null });
   const [toastMsg, setToastMsg] = useState('');
   const [toastKey, setToastKey] = useState(0);
   const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 900px)').matches);
@@ -2321,6 +2347,7 @@ function App() {
               addRecord={addRecord}
               addBook={addBook} deleteBook={deleteBook}
               exportData={exportData} importData={importData} toast={toast}
+              editTrigger={editTrigger}
             />
           )}
           {page === 'add' && (
@@ -2343,6 +2370,7 @@ function App() {
                 addRecord={addRecord}
                 toast={toast}
                 onBack={() => navigate('home')}
+                onEdit={(b) => { setEditTrigger(prev => ({ n: prev.n + 1, bookId: b.id })); navigate('home'); }}
               />
             ) : null;
           })()}
