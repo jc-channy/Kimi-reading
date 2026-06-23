@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <title>Kimi 英文共讀紀錄</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js" crossorigin></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js" crossorigin></script>
@@ -13,27 +14,33 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #FDF8F2;
+    --bg: #FFFDF8;
     --card: #FFFFFF;
-    --card-border: #EAD8C0;
-    --primary: #C8895A;
-    --primary-dark: #A06838;
-    --primary-btn: linear-gradient(135deg, #C8895A, #A06838);
-    --text: #3A2810;
-    --text-sub: #9A7848;
-    --text-light: #B09070;
-    --nav-active: #9E6838;
-    --hero-a: #E8CFA8;
-    --hero-b: #F2E0C0;
-    --hero-c: #FAF0DC;
-    --star-hi: #E8A840;
-    --star-mid: #C8A850;
-    --star-lo: #C0B098;
-    --shadow: 0 2px 12px rgba(160,104,56,0.10);
-    --shadow-lg: 0 4px 20px rgba(160,104,56,0.15);
-    --radius: 14px;
+    --card-border: #EDE8E0;
+    --primary: #f1aa56;
+    --primary-dark: #b07020;
+    --primary-btn: linear-gradient(135deg, #f1aa56, #e09030);
+    --text: #2C1A08;
+    --text-sub: #9A8070;
+    --text-light: #B4A090;
+    --nav-active: #b07020;
+    --hero-a: #fff;
+    --hero-b: #fff;
+    --hero-c: #FFFDF8;
+    --star-hi: #f1aa56;
+    --star-mid: #fed57d;
+    --star-lo: #D8D0C8;
+    --shadow: 0 2px 8px rgba(0,0,0,0.06);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.10);
+    --radius: 18px;
     --nav-h: 68px;
-    --font-round: 'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', 'rounded-mplus-1p', 'Nunito', sans-serif;
+    --font-round: 'Nunito', 'Hiragino Maru Gothic ProN', 'Hiragino Maru Gothic Pro', sans-serif;
+    --mp-orange: #f1aa56; --mp-orange-bg: #FFF5E8; --mp-orange-text: #b07020;
+    --mp-teal:   #b4e0e6; --mp-teal-bg:   #EDF7FA; --mp-teal-text:   #2C7A80;
+    --mp-pink:   #fbb6b6; --mp-pink-bg:   #FFF0F0; --mp-pink-text:   #903030;
+    --mp-blue:   #98c1e9; --mp-blue-bg:   #EFF6FD; --mp-blue-text:   #2C5A80;
+    --mp-yellow: #fed57d; --mp-yellow-bg: #FFFAE8; --mp-yellow-text: #8A6800;
+    --mp-green:  #69804e; --mp-green-bg:  #EFF5E8; --mp-green-text:  #3A5020;
   }
   html, body { height: 100%; background: var(--bg); font-family: var(--font-round); color: var(--text); }
   #root { height: 100%; }
@@ -44,23 +51,22 @@
 
   /* ── Hero ── */
   .hero {
-    background: linear-gradient(160deg, var(--hero-a) 0%, var(--hero-b) 40%, var(--hero-c) 70%, var(--bg) 100%);
-    padding: 32px 20px 24px;
+    background: #fff;
+    padding: 24px 18px 16px;
+    position: relative;
+    overflow: hidden;
   }
-  .hero-title { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: 0.02em; }
-  .hero-sub { font-size: 13px; color: var(--text-sub); margin-top: 4px; }
-  .hero-stats { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  .hero-title { font-size: 22px; font-weight: 900; color: var(--text); letter-spacing: -0.3px; }
+  .hero-sub { font-size: 12px; color: var(--text-sub); margin-top: 3px; }
+  .hero-stats { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
   .stat-pill {
-    background: rgba(255,255,255,0.72);
-    border: 0.5px solid var(--card-border);
     border-radius: 24px;
-    padding: 6px 14px;
-    display: flex; align-items: center; gap: 6px;
-    font-size: 13px; color: var(--text); font-weight: 600;
-    backdrop-filter: blur(4px);
+    padding: 5px 12px;
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 800;
   }
-  .stat-pill i { font-size: 15px; color: var(--primary); }
-  .stat-pill span { font-size: 11px; color: var(--text-sub); font-weight: 400; margin-left: 2px; }
+  .stat-pill i { font-size: 14px; }
+  .stat-pill span { font-size: 10px; font-weight: 600; margin-left: 1px; }
   .hero-cta {
     margin-top: 16px;
     display: inline-flex; align-items: center; gap: 8px;
@@ -97,11 +103,11 @@
   .book-card-meta { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
   .book-stars { display: flex; gap: 2px; }
   .date-chip {
-    background: #F5EDE0;
-    border-radius: 8px;
-    padding: 1px 6px;
+    background: #fff;
+    border-radius: 20px;
+    padding: 2px 7px;
     font-size: 10px; color: var(--text-sub);
-    font-weight: 500;
+    font-weight: 800;
   }
   .book-card-right { padding: 12px 14px 12px 0; display: flex; align-items: center; }
   .book-count-badge {
@@ -118,8 +124,8 @@
   .bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0;
     height: var(--nav-h);
-    background: rgba(253,248,242,0.95);
-    border-top: 0.5px solid var(--card-border);
+    background: rgba(255,255,255,0.96);
+    border-top: 1.5px solid #F0EAE0;
     backdrop-filter: blur(10px);
     display: flex; align-items: center; justify-content: space-around;
     padding: 0 20px;
@@ -129,12 +135,12 @@
     display: flex; flex-direction: column; align-items: center; gap: 2px;
     background: none; border: none; cursor: pointer;
     color: var(--text-light); font-family: var(--font-round);
-    padding: 6px 16px; border-radius: 12px; transition: color 0.15s;
+    padding: 6px 20px; border-radius: 16px; transition: all 0.15s;
     flex: 1;
   }
-  .nav-btn.on { color: var(--nav-active); }
+  .nav-btn.on { color: var(--mp-orange-text); background: var(--mp-orange-bg); }
   .nav-btn i { font-size: 22px; }
-  .nl { font-size: 10px; font-weight: 600; }
+  .nl { font-size: 10px; font-weight: 800; }
   .fab {
     width: 52px; height: 52px; border-radius: 50%;
     background: var(--primary-btn);
@@ -280,21 +286,24 @@
   .series-chevron { font-size: 18px; transition: transform 0.2s; }
   .series-chevron.open { transform: rotate(180deg); }
   .series-books {
-    border: 0.5px solid var(--card-border);
-    border-top: none;
-    border-radius: 0 0 10px 10px;
-    overflow: hidden;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+    padding: 4px 0 4px;
   }
   .lib-book-row {
     background: var(--card);
     display: flex; align-items: center;
-    padding: 12px 14px; gap: 10px;
-    border-bottom: 0.5px solid var(--card-border);
+    padding: 10px 0 10px 0; gap: 0;
+    border-radius: 18px;
+    margin: 0 14px 8px;
     cursor: pointer;
+    overflow: hidden;
+    border: none;
   }
-  .lib-book-row:last-child { border-bottom: none; }
-  .lib-book-row:active { background: #FDF5EC; }
-  .lib-spine { width: 5px; align-self: stretch; border-radius: 2px; flex-shrink: 0; }
+  .lib-book-row:last-child { margin-bottom: 0; }
+  .lib-book-row:active { opacity: 0.88; }
+  .lib-spine { width: 6px; align-self: stretch; flex-shrink: 0; border-radius: 0; }
   .lib-book-info { flex: 1; min-width: 0; }
   .lib-book-title { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lib-book-author { font-size: 12px; color: var(--text-light); }
@@ -637,7 +646,11 @@ const dbToRecord = row => ({
 });
 
 /* ── Constants ── */
-const SPINE_COLORS = ['#E8A855','#E89880','#90C8A0','#8BBCE0','#E0A0B8','#B8A8E0','#E8C878','#A8C890','#D4A8D0','#9ABCD8'];
+const SPINE_COLORS = ['#f1aa56','#b4e0e6','#fbb6b6','#98c1e9','#fed57d','#69804e','#f1aa56','#b4e0e6','#fbb6b6','#98c1e9'];
+const SPINE_BG    = ['#FFF5E8','#EDF7FA','#FFF0F0','#EFF6FD','#FFFAE8','#EFF5E8','#FFF5E8','#EDF7FA','#FFF0F0','#EFF6FD'];
+const SPINE_TEXT  = ['#b07020','#2C7A80','#903030','#2C5A80','#8A6800','#3A5020','#b07020','#2C7A80','#903030','#2C5A80'];
+const getSpineBgColor   = (id) => SPINE_BG[id.charCodeAt(0) % SPINE_BG.length];
+const getSpineTextColor = (id) => SPINE_TEXT[id.charCodeAt(0) % SPINE_TEXT.length];
 const SERIES_THEMES = [
   { bg: '#FDF0DC', dot: '#E8A840', border: '#E8C890', text: '#7A5820' },
   { bg: '#FCE8E4', dot: '#D87060', border: '#EAA898', text: '#7A3828' },
@@ -647,7 +660,7 @@ const SERIES_THEMES = [
 ];
 
 const getSpineColor = (id) => SPINE_COLORS[id.charCodeAt(0) % SPINE_COLORS.length];
-const starColor = (r) => r >= 4 ? '#E8A840' : r >= 3 ? '#C8A850' : '#C0B098';
+const starColor = (r) => r >= 4 ? '#f1aa56' : r >= 3 ? '#fed57d' : '#D8D0C8';
 
 const DURATION_OPTIONS = ['10分鐘', '15分鐘', '20分鐘', '30分鐘', '40分鐘', '45分鐘', '60分鐘'];
 const REACTION_OPTIONS = [
@@ -1323,6 +1336,9 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
     const isSelected = selectedIds.has(b.id);
     const isDragOver = dragOverId === b.id;
     const showDrag = sortBy === 'manual' && !batchMode;
+    const spineBg = getSpineBgColor(b.id);
+    const spineText = getSpineTextColor(b.id);
+    const spineColor = getSpineColor(b.id);
 
     const handleClick = () => {
       if (batchMode) { toggleBatchSelect(b.id); return; }
@@ -1336,7 +1352,7 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
           className={'lib-book-row' + (isSelected ? ' batch-sel' : '') + (isDragOver ? ' drag-over' : '')}
           data-edit-id={b.id}
           onClick={handleClick}
-          style={{ userSelect: 'none' }}
+          style={{ userSelect: 'none', background: isSelected ? '#FFF5E8' : spineBg }}
           onTouchStart={!batchMode ? handleLongPressStart(b) : undefined}
           onTouchEnd={handleLongPressEnd}
           onTouchMove={handleLongPressMove}
@@ -1356,27 +1372,27 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
               <div className={'bcheck' + (isSelected ? ' on' : '')} />
             </div>
           )}
-          <div className="lib-spine" style={{ background: getSpineColor(b.id) }} />
-          <div className="lib-book-info">
+          <div className="lib-spine" style={{ background: spineColor }} />
+          <div className="lib-book-info" style={{ padding:'8px 8px' }}>
             <div className="lib-book-title">
               {b.title}
               {b.status === 'graduated' && <span style={{ fontSize:11, marginLeft:5, verticalAlign:'middle' }}>🎓</span>}
-              {b.status === 'wantToRead' && <span style={{ fontSize:10, marginLeft:5, padding:'1px 5px', borderRadius:6, background:'#E4F0E8', color:'#3A8050', fontWeight:600, verticalAlign:'middle' }}>待讀</span>}
+              {b.status === 'wantToRead' && <span style={{ fontSize:10, marginLeft:5, padding:'1px 5px', borderRadius:6, background:'#E4F0E8', color:'#3A8050', fontWeight:700, verticalAlign:'middle' }}>待讀</span>}
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:2, flexWrap:'wrap' }}>
               {b.author && <span className="lib-book-author">{b.author}</span>}
-              {dates.map(d => <span key={d} className="date-chip">{fmtDate(d)}</span>)}
+              {dates.map(d => <span key={d} className="date-chip" style={{ color: spineText }}>{fmtDate(d)}</span>)}
             </div>
           </div>
           {!batchMode && (
             <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0, paddingRight:10 }}>
               <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
-                {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?starColor(b.rating):'#DDD0C0'}}/>)}</div>}
-                {rc > 0 && <span style={{fontSize:11,color:'var(--text-light)'}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
+                {b.rating > 0 && <div className="lib-book-stars">{[1,2,3,4,5].map(i=><i key={i} className={i<=b.rating?'ti ti-star-filled':'ti ti-star'} style={{fontSize:12,color:i<=b.rating?spineColor:'#DDD0C0'}}/>)}</div>}
+                {rc > 0 && <span style={{fontSize:11,fontWeight:700,color:spineText}}><i className="ti ti-headphones" style={{fontSize:11}}/> {rc}</span>}
               </div>
-              <button onClick={e=>{e.stopPropagation();setQuickLogBookId(b.id);}} style={{width:56,height:56,borderRadius:14,border:'1.5px solid var(--primary)',background:'#F5E8DA',color:'var(--primary-dark)',cursor:'pointer',fontFamily:'var(--font-round)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,flexShrink:0}}>
+              <button onClick={e=>{e.stopPropagation();setQuickLogBookId(b.id);}} style={{width:54,height:54,borderRadius:14,border:'none',background:'#fff',color:spineText,cursor:'pointer',fontFamily:'var(--font-round)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,flexShrink:0}}>
                 <i className="ti ti-plus" style={{fontSize:20}} />
-                <span style={{fontSize:10,fontWeight:600}}>記錄</span>
+                <span style={{fontSize:10,fontWeight:800}}>記錄</span>
               </button>
             </div>
           )}
@@ -1393,10 +1409,10 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
           <div className="hero-title">📖 Kimi 的英文共讀</div>
           <div className="hero-sub">每一天的聆聽，都是成長的足跡</div>
           <div className="hero-stats">
-            <div className="stat-pill"><i className="ti ti-calendar-heart" />{totalDays}<span>共讀天數</span></div>
-            <div className="stat-pill"><i className="ti ti-books" />{books.length}<span>本書</span></div>
-            {streak > 0 && <div className="stat-pill"><i className="ti ti-flame" style={{ color:'#E87840' }} />{streak}<span>連續天</span></div>}
-            <div className="stat-pill"><i className="ti ti-calendar-month" />{thisMonth}<span>本月</span></div>
+            <div className="stat-pill" style={{ background:'var(--mp-teal-bg)', color:'var(--mp-teal-text)' }}><i className="ti ti-calendar-heart" />{totalDays}<span>共讀天數</span></div>
+            <div className="stat-pill" style={{ background:'var(--mp-blue-bg)', color:'var(--mp-blue-text)' }}><i className="ti ti-books" />{books.length}<span>本書</span></div>
+            {streak > 0 && <div className="stat-pill" style={{ background:'var(--mp-orange-bg)', color:'var(--mp-orange-text)' }}><i className="ti ti-flame" />{streak}<span>連續天</span></div>}
+            <div className="stat-pill" style={{ background:'var(--mp-pink-bg)', color:'var(--mp-pink-text)' }}><i className="ti ti-calendar-month" />{thisMonth}<span>本月</span></div>
           </div>
         </div>
       )}
@@ -1495,7 +1511,7 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
               {sortedBooks.length === 0 ? (
                 <div className="empty-state"><i className="ti ti-filter-off" /><p>這個分類目前沒有書</p></div>
               ) : (
-                <div className="series-books" style={{ borderRadius:10, border:'0.5px solid var(--card-border)' }}>
+                <div className="series-books">
                   {sortedBooks.map(b => <BookRow key={b.id} b={b} sortedForDrag={sortedBooks} />)}
                 </div>
               )}
@@ -1532,7 +1548,7 @@ function Dashboard({ books, records, navigate, addRecord, addBook, deleteBook, e
                 <>
                   {seriesList.length > 0 && <div className="standalone-header">單本書</div>}
                   <div style={{ margin:'0 16px 8px' }}>
-                    <div className="series-books" style={{ borderRadius:10, border:'0.5px solid var(--card-border)' }}>
+                    <div className="series-books">
                       {standaloneBooks.map(b => <BookRow key={b.id} b={b} />)}
                     </div>
                   </div>
